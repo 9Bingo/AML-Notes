@@ -1,0 +1,261 @@
+\begin{tikzpicture}[
+    font=\small,
+    flow/.style={
+        draw=black!80,
+        -Latex,
+        line width=0.8pt,
+        shorten <=1.5pt,
+        shorten >=1.5pt
+    },
+    inputbox/.style={
+        draw=black!75,
+        rounded corners=4pt,
+        fill=orange!8,
+        text width=4.0cm,
+        minimum height=4.9cm,
+        align=center,
+        line width=0.8pt,
+        inner xsep=7pt,
+        inner ysep=7pt
+    },
+    branchbox/.style={
+        draw=black!75,
+        rounded corners=4pt,
+        text width=5.2cm,
+        minimum height=2.85cm,
+        align=center,
+        line width=0.8pt,
+        inner xsep=7pt,
+        inner ysep=6pt
+    },
+    positivebox/.style={
+        branchbox,
+        fill=green!9
+    },
+    negativebox/.style={
+        branchbox,
+        fill=red!6
+    },
+    resultbox/.style={
+        draw=black!75,
+        rounded corners=4pt,
+        text width=4.2cm,
+        minimum height=2.35cm,
+        align=center,
+        line width=0.8pt,
+        inner xsep=7pt,
+        inner ysep=6pt
+    },
+    positiveresult/.style={
+        resultbox,
+        fill=green!6
+    },
+    negativeresult/.style={
+        resultbox,
+        fill=red!4
+    },
+    principlebox/.style={
+        draw=black!65,
+        rounded corners=4pt,
+        fill=gray!6,
+        text width=13.3cm,
+        minimum height=1.2cm,
+        align=center,
+        line width=0.7pt,
+        inner xsep=8pt,
+        inner ysep=6pt
+    },
+    arrowlabel/.style={
+        font=\footnotesize,
+        text=black!80,
+        fill=white,
+        inner xsep=2pt,
+        inner ysep=1pt
+    },
+    branchlabel/.style={
+        font=\footnotesize,
+        text=black!80,
+        fill=white,
+        inner xsep=2pt,
+        inner ysep=1pt
+    }
+]
+
+% 设置安全边界，避免导出时裁切
+\path[use as bounding box]
+    (-0.2,-0.35) rectangle (18.2,8.2);
+
+% ==================================================
+% 左侧：当前状态、策略与动作采样
+% ==================================================
+
+\node[inputbox] (input) at (2.5,4.75) {
+    {\bfseries 当前策略与动作}\\[6pt]
+
+    {\bfseries 当前棋盘状态 $s_t$}\\[4pt]
+    候选位置：$B=(8,8)$\\[4pt]
+    当前策略概率：\\[2pt]
+    $\displaystyle
+    \pi_{\theta}(B\mid s_t)=0.40
+    $\\[9pt]
+
+    {\footnotesize 按当前策略采样}\\[-1pt]
+    $\Downarrow$\\[3pt]
+
+    $\displaystyle
+    a_t=B=(8,8)
+    $\\[7pt]
+
+    {\footnotesize
+    随后观察该动作产生的实际回报}
+};
+
+% ==================================================
+% 中间：正优势分支
+% ==================================================
+
+\node[positivebox] (positive) at (9.0,6.40) {
+    {\bfseries 正优势（$+$）：回报高于基线}\\[6pt]
+
+    实际回报：$G_t=8$\\[3pt]
+    状态基线：$b(s_t)=6$\\[5pt]
+
+    优势估计：$\widehat{A}_t=G_t-b(s_t)$\\[2pt]
+    $\displaystyle
+    =8-6=2>0
+    $\\[5pt]
+
+    {\footnotesize
+    该动作表现优于当前局面的平均水平}
+};
+
+% ==================================================
+% 中间：负优势分支
+% ==================================================
+
+\node[negativebox] (negative) at (9.0,3.10) {
+    {\bfseries 负优势（$-$）：回报低于基线}\\[6pt]
+
+    实际回报：$G_t=3$\\[3pt]
+    状态基线：$b(s_t)=6$\\[5pt]
+
+    优势估计：$\widehat{A}_t=G_t-b(s_t)$\\[2pt]
+    $\displaystyle
+    =3-6=-3<0
+    $\\[5pt]
+
+    {\footnotesize
+    该动作表现低于当前局面的平均水平}
+};
+
+% ==================================================
+% 右侧：正优势对应的策略更新结果
+% ==================================================
+
+\node[positiveresult] (positive-result) at (15.6,6.40) {
+    {\bfseries 动作概率提高（$\uparrow$）}\\[7pt]
+
+    更新前：\\[-1pt]
+    $\displaystyle
+    \pi_{\theta}(B\mid s_t)=0.40
+    $\\[5pt]
+
+    更新后：\\[-1pt]
+    $\displaystyle
+    \pi_{\theta}(B\mid s_t)=0.48
+    $\\[6pt]
+
+    {\footnotesize
+    后续更容易选择动作 $B$}
+};
+
+% ==================================================
+% 右侧：负优势对应的策略更新结果
+% ==================================================
+
+\node[negativeresult] (negative-result) at (15.6,3.10) {
+    {\bfseries 动作概率降低（$\downarrow$）}\\[7pt]
+
+    更新前：\\[-1pt]
+    $\displaystyle
+    \pi_{\theta}(B\mid s_t)=0.40
+    $\\[5pt]
+
+    更新后：\\[-1pt]
+    $\displaystyle
+    \pi_{\theta}(B\mid s_t)=0.32
+    $\\[6pt]
+
+    {\footnotesize
+    后续选择动作 $B$ 的概率下降}
+};
+
+% ==================================================
+% 左侧动作节点到正负分支的公共分叉
+% ==================================================
+
+\coordinate (split) at (5.35,4.75);
+\coordinate (positive-join) at (5.35,6.40);
+\coordinate (negative-join) at (5.35,3.10);
+
+% 从左侧动作模块引出主干
+\draw[flow]
+    (input.east)
+    --
+    (split);
+
+% 公共分叉点
+\fill[black!80]
+    (split) circle (1.4pt);
+
+% 正优势分支
+\draw[flow]
+    (split)
+    --
+    (positive-join)
+    --
+    node[midway, above=3pt, branchlabel]
+    {$G_t>b(s_t)$}
+    (positive.west);
+
+% 负优势分支
+\draw[flow]
+    (split)
+    --
+    (negative-join)
+    --
+    node[midway, below=3pt, branchlabel]
+    {$G_t<b(s_t)$}
+    (negative.west);
+
+% ==================================================
+% 优势分支到概率更新结果
+% ==================================================
+
+\draw[flow]
+    (positive.east)
+    --
+    node[midway, above=4pt, arrowlabel]
+    {提高选择概率}
+    (positive-result.west);
+
+\draw[flow]
+    (negative.east)
+    --
+    node[midway, above=4pt, arrowlabel]
+    {降低选择概率}
+    (negative-result.west);
+
+% ==================================================
+% 底部：统一的基线与策略更新原则
+% ==================================================
+
+\node[principlebox] (principle) at (9.0,0.45) {
+    {\bfseries 基线与策略更新原则}\\[5pt]
+    常用状态基线为
+    $\displaystyle b(s_t)=V^{\pi}(s_t)$。\\[3pt]
+    策略更新关注的不是回报的绝对大小，
+    而是动作结果相对于当前平均水平的好坏。
+};
+
+\end{tikzpicture}

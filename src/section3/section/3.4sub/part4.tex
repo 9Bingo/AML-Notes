@@ -1,0 +1,139 @@
+\label{sec:dpo}
+
+基于 PPO 的 RLHF 虽然有效，但需要同时维护奖励模型、价值模型、参考模型和策略四个网络，训练流程较为复杂。一个自然的想法是：能否跳过显式的奖励建模，直接利用人类偏好数据优化语言模型？\textbf{直接偏好优化（DPO）}正是沿着这一思路提出的方法 \cite{rafailov-etal:2024direct}。图 \ref{fig:rlhf-vs-dpo} 展示了标准 RLHF 方法与 DPO 方法的对比。
+
+\begin{figure}[!t]
+\centering
+\input{figures/Chapter4/figure-rlhf-vs-dpo}
+\caption{标准的 RLHF (PPO) 与 DPO。在 RLHF 中，人类偏好数据用于训练一个奖励模型，该模型随后被用于训练策略以及价值函数。在 DPO 中，人类偏好数据的使用更加直接，策略直接在此数据上进行训练，无需训练奖励模型。}
+\label{fig:rlhf-vs-dpo}
+\end{figure}
+
+回顾 RLHF 中策略训练的出发点，它是一个带 KL 惩罚的目标函数
+\begin{equation}
+\tilde{\theta} = \argmin_{\theta}\; \mathbb{E}_{\mathbf{x}\sim\mathcal{D}}\,
+\mathbb{E}_{\mathbf{y}\sim\pi_{\theta}(\cdot|\mathbf{x})}\Big[
+-r(\mathbf{x},\mathbf{y}) + \beta\big(\log\pi_{\theta}(\mathbf{y}|\mathbf{x}) - \log\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x})\big)
+\Big],
+\label{eq:dpo-start}
+\end{equation}
+其中 $r(\mathbf{x},\mathbf{y})$ 是奖励模型给出的分数，超参数 $\beta$ 控制策略与参考模型 $\pi_{\theta_{\mathrm{ref}}}$ 的接近程度。该目标本质上鼓励模型生成高奖励且不偏离太远的回复。
+
+这个优化问题存在一个重要的闭式解。通过将目标视为关于分布 $\pi_{\theta}$ 的泛函并求极值，可以证明最优策略 $\pi^*$ 满足
+\begin{equation}
+\pi^*(\mathbf{y}|\mathbf{x}) \propto \pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x})\,
+\exp\!\Big(\frac{1}{\beta}\,r(\mathbf{x},\mathbf{y})\Big).
+\label{eq:dpo-optimal-policy}
+\end{equation}
+也就是说，最优策略是在参考策略的基础上，按奖励的指数倍数重新加权得到的分布。对该式两边取对数并整理，可以反过来把奖励表示为策略的函数
+\begin{equation}
+r(\mathbf{x},\mathbf{y}) = \beta\,\log\frac{\pi^*(\mathbf{y}|\mathbf{x})}{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x})} + \beta\log Z(\mathbf{x}),
+\label{eq:dpo-reward}
+\end{equation}
+其中 $Z(\mathbf{x})$ 是与 $\mathbf{y}$ 无关的归一化常数。
+
+现在，将这一奖励表达式代入训练奖励模型时所使用的 Bradley–Terry 偏好模型中。在 RLHF 框架下，我们假设人类偏好 $\mathbf{y}_a \succ \mathbf{y}_b$ 的概率为
+\begin{equation}
+\Pr(\mathbf{y}_a \succ \mathbf{y}_b\mid\mathbf{x}) = \sigma\big(r(\mathbf{x},\mathbf{y}_a) - r(\mathbf{x},\mathbf{y}_b)\big),
+\end{equation}
+其中 $\sigma$ 是 sigmoid 函数。用式 (\ref{eq:dpo-reward}) 替换奖励后，两项中的 $\beta\log Z(\mathbf{x})$ 恰好相消，得到
+\begin{equation}
+\Pr\nolimits_{\theta}(\mathbf{y}_a \succ \mathbf{y}_b\mid\mathbf{x}) =
+\sigma\!\Big(\beta\log\frac{\pi_{\theta}(\mathbf{y}_a|\mathbf{x})}{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}_a|\mathbf{x})}
+- \beta\log\frac{\pi_{\theta}(\mathbf{y}_b|\mathbf{x})}{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}_b|\mathbf{x})}\Big).
+\label{eq:dpo-preference}
+\end{equation}
+这里的关键在于，归一化常数 $Z(\mathbf{x})$ 被消掉了，偏好概率仅依赖于策略和参考模型输出的对数比。这意味着我们不再需要显式训练奖励模型，可以直接用人类偏好数据训练策略。
+
+由此，DPO 的损失函数直接定义为负对数似然，形式与训练奖励模型时几乎一致，只是参数变成了策略的 $\theta$：
+\begin{equation}
+\mathcal{L}_{\mathrm{dpo}}(\theta) = -\mathbb{E}_{(\mathbf{x},\mathbf{y}_a,\mathbf{y}_b)\sim\mathcal{D}_r}
+\Big[\log \Pr\nolimits_{\theta}(\mathbf{y}_a \succ \mathbf{y}_b\mid\mathbf{x})\Big].
+\label{eq:dpo-loss}
+\end{equation}
+最小化这一损失，等价于增大被人类偏好的回复相较于参考模型的概率比，同时压低不被偏好的回复的概率比。
+
+与 PPO 相比，DPO 将整个对齐过程简化为一个\textbf{监督式的分类任务}：只需从数据集中读取人类偏好对，直接更新语言模型参数，无需在线采样、价值网络和奖励网络。这使得 DPO 的训练更加稳定、样本效率更高，且易于实现。当然，DPO 本质上是一种离线方法，无法像在线 RL 那样通过主动探索发现超越固定数据集的新策略，但它凭借极简的流程已经成为目前最流行的人类偏好对齐方法之一。
+
+\begin{importantnote}
+直接偏好优化（DPO）省去了奖励模型的训练和强化学习采样，将偏好对齐转化为一个分类损失：通过比较两个输出相对于参考模型的概率比来直接更新策略。这一方法简化了流程且训练更稳定，但本质上是离线的，无法像在线 RL 那样探索新路径。理解其与 RLHF 的异同是掌握对齐技术的关键。
+\end{importantnote}
+
+
+% \noindent 虽然学习奖励模型是强化学习中的一个标准步骤，但它使得整个训练过程比监督学习复杂得多。训练一个可靠的奖励模型本身就不是一项容易的任务，而一个训练不佳的奖励模型会极大地影响策略学习的结果。我们现在考虑一种替代的对齐方法，称为 \mindex{直接偏好优化} (\mindex{DPO})，它通过消除显式建模奖励的需要来简化训练框架 \cite{rafailov-etal:2024direct}。该方法直接根据用户偏好优化策略，而不是开发一个单独的奖励模型。因此，我们可以以一种类似监督学习的方式实现人类偏好对齐。图 \ref{fig:rlhf-vs-dpo} 展示了标准 RLHF 方法与 DPO 方法的比较。
+
+% \begin{figure}[!t]
+% \centering
+% \input{figures/Chapter4/figure-rlhf-vs-dpo}
+% \caption{标准的 RLHF (PPO) 与 DPO。在 RLHF 中，人类偏好数据用于训练一个奖励模型，该模型随后被用于训练策略以及价值函数。在 DPO 中，人类偏好数据的使用更加直接，策略直接在此数据上进行训练，无需训练奖励模型。}
+% \label{fig:rlhf-vs-dpo}
+% \end{figure}
+
+% 在推导 DPO 目标之前，让我们首先回顾一下 RLHF 中使用的策略训练目标。如第 \ref{sec:rlhf-training-llms} 节所述，策略通常通过优化带有惩罚项的损失函数进行训练。DPO 方法假设一个简单的损失函数，其中给定输入 $\mathbf{x}$ 的输出 $\mathbf{y}$ 的质量由奖励模型 $r(\mathbf{x},\mathbf{y})$ 评估。因此，训练目标由下式给出
+% \begin{eqnarray}
+% \tilde{\theta} & = & \argmin_{\theta} \mathbb{E}_{\mathbf{x} \sim \mathcal{D}} \mathbb{E}_{\mathbf{y} \sim \pi_{\theta}(\cdot|\mathbf{x})} \big[ \underbrace{-r(\mathbf{x},\mathbf{y})}_{\text{loss}} + \beta \underbrace{(\log \pi_{\theta}(\mathbf{y}|\mathbf{x}) - \log \pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x}) )}_{\text{penalty}} \big] \label{eq:dpo-basic-objective}
+% \end{eqnarray}
+
+% \noindent 请注意，在这个优化问题中，只有项 $\pi_{\theta}(\mathbf{y}|\mathbf{x})$ 依赖于目标策略 $\pi_{\theta}(\cdot)$。奖励模型 $r(\mathbf{x}, \mathbf{y})$ 和参考模型 $\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x})$ 都被假定在给定 $\mathbf{x}$ 和 $\mathbf{y}$ 的情况下是固定的。与 PPO 相比，这是一个很强的假设，但正如稍后将展示的，它简化了问题，并且对于推导 DPO 目标至关重要。
+
+% 由于 $\theta$ 是我们想要优化的变量，我们重新排列等式 (\ref{eq:dpo-basic-objective}) 的右侧，以将 $\pi_{\theta}(\mathbf{y}|\mathbf{x})$ 分离为一个独立的项：
+% \begin{eqnarray}
+% \tilde{\theta} & = & \argmin_{\theta} \mathbb{E}_{\mathbf{x} \sim \mathcal{D}} \mathbb{E}_{\mathbf{y} \sim \pi_{\theta}(\cdot|\mathbf{x})} \big[ \beta \log \pi_{\theta}(\mathbf{y}|\mathbf{x}) - \beta \log \pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x}) - r(\mathbf{x},\mathbf{y}) \big] \nonumber \\
+% & = & \argmin_{\theta} \mathbb{E}_{\mathbf{x} \sim \mathcal{D}} \mathbb{E}_{\mathbf{y} \sim \pi_{\theta}(\cdot|\mathbf{x})} \big[ \log \pi_{\theta}(\mathbf{y}|\mathbf{x}) - \big(\log \pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x}) + \frac{1}{\beta} r(\mathbf{x},\mathbf{y}) \big) \big] \nonumber \\
+% & = & \argmin_{\theta} \mathbb{E}_{\mathbf{x} \sim \mathcal{D}} \mathbb{E}_{\mathbf{y} \sim \pi_{\theta}(\cdot|\mathbf{x})} \big[ \underbrace{\log \pi_{\theta}(\mathbf{y}|\mathbf{x})}_{\text{dependent on $\theta$}} - \underbrace{\log \pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x}) \exp \big(\frac{1}{\beta} r(\mathbf{x},\mathbf{y}) \big)}_{\text{not dependent on $\theta$}} \big] \label{eq:dpo-raw-objective-with-no-normalization}
+% \end{eqnarray}
+
+% 这个方程将目标函数定义为 $y$ 的对数概率分布函数与另一个 $y$ 的函数之间的差。这种形式的目标函数似乎并不"理想"，因为我们通常希望看到两个分布之间的差异，以便我们可以将这种差异解释为分布之间的某种散度。一个简单的想法是将第二项（即 $ \log \pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x}) \exp(\frac{1}{\beta} r(\mathbf{x},\mathbf{y}))$）转换为在 $\mathbf{y}$ 定义域上的对数概率分布。如果我们将 $ \pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x}) \exp(\frac{1}{\beta} r(\mathbf{x},\mathbf{y}))$ 视为 $y$ 的未归一化概率，我们可以通过除以一个归一化因子将其转换为归一化概率：
+% \begin{eqnarray}
+% Z(\mathbf{x}) & = & \sum_{\mathbf{y}} \pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x}) \exp \big(\frac{1}{\beta} r(\mathbf{x},\mathbf{y}) \big)
+% \end{eqnarray}
+
+% 因此，我们可以通过下式定义一个概率分布
+% \begin{eqnarray}
+% \pi^*(\mathbf{y}|\mathbf{x}) & = & \frac{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x}) \exp \big(\frac{1}{\beta} r(\mathbf{x},\mathbf{y}) \big)}{Z(\mathbf{x})}
+% \end{eqnarray}
+
+% 然后我们将等式 (\ref{eq:dpo-raw-objective-with-no-normalization}) 重写为
+% \begin{eqnarray}
+% \tilde{\theta} & = & \argmin_{\theta} \mathbb{E}_{\mathbf{x} \sim \mathcal{D}} \mathbb{E}_{\mathbf{y} \sim \pi_{\theta}(\cdot|\mathbf{x})} \Big[ \log \pi_{\theta}(\mathbf{y}|\mathbf{x}) - \log \frac{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x}) \exp \big(\frac{1}{\beta} r(\mathbf{x},\mathbf{y}) \big)}{Z(\mathbf{x} \big)} \nonumber \\
+% & & \hspace{10.5em} - \log Z(\mathbf{x}) \Big] \nonumber \\
+% & = & \argmin_{\theta} \mathbb{E}_{\mathbf{x} \sim \mathcal{D}} \mathbb{E}_{\mathbf{y} \sim \pi_{\theta}(\cdot|\mathbf{x})} \Big[ \log \pi_{\theta}(\mathbf{y}|\mathbf{x}) - \log \pi^{*}(\mathbf{y}|\mathbf{x}) - \log Z(\mathbf{x}) \Big] \nonumber \\
+% & = & \argmin_{\theta} \mathbb{E}_{\mathbf{x} \sim \mathcal{D}} \bigg[ \mathbb{E}_{\mathbf{y} \sim \pi_{\theta}(\cdot|\mathbf{x})} \Big[ \log \pi_{\theta}(\mathbf{y}|\mathbf{x}) - \log \pi^{*}(\mathbf{y}|\mathbf{x}) \Big] \nonumber \\
+% &  & \hspace{6.5em} - \mathbb{E}_{\mathbf{y} \sim \pi_{\theta}(\cdot|\mathbf{x})} \big[ \log Z(\mathbf{x}) \big] \bigg] \nonumber \\
+% & = & \argmin_{\theta} \mathbb{E}_{\mathbf{x} \sim \mathcal{D}} \Big[ \underbrace{\mathrm{KL} \big(\pi_{\theta}(\cdot|\mathbf{x})\ ||\ \pi^{*}(\cdot|\mathbf{x}) \big)}_{\text{KL divergence}} - \underbrace{\log Z(\mathbf{x})}_{\text{constant wrt. $\theta$}} \Big]
+% \end{eqnarray}
+
+% 由于 $\log Z(\mathbf{x})$ 与 $\theta$ 无关，它不影响 $\argmin_{\theta}$ 操作的结果，可以从目标中移除。现在我们获得了一个新的训练目标，它通过最小化 $\pi_{\theta}(\cdot|\mathbf{x})$ 和 $\pi^{*}(\cdot|\mathbf{x})$ 之间的 KL 散度来找到最优策略 $\pi_{\theta}$
+% \begin{eqnarray}
+% \tilde{\theta} & = & \argmin_{\theta} \mathbb{E}_{\mathbf{x} \sim \mathcal{D}} \Big[ \mathrm{KL} \big(\pi_{\theta}(\cdot|\mathbf{x})\ ||\ \pi^{*}(\cdot|\mathbf{x}) \big) \Big]
+% \end{eqnarray}
+
+% 显然，这个优化问题的解由下式给出
+% \begin{eqnarray}
+% \pi_{\theta}(\mathbf{y}|\mathbf{x}) & = & \pi^{*}(\mathbf{y}|\mathbf{x}) \nonumber \\
+% & = & \frac{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x}) \exp \big(\frac{1}{\beta} r(\mathbf{x},\mathbf{y}))}{Z(\mathbf{x} \big)}
+% \end{eqnarray}
+
+% 给定这个方程，我们可以使用目标模型 $\pi_{\theta}(\mathbf{y}|\mathbf{x})$、参考模型 $\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x})$ 和归一化因子 $Z(\mathbf{x})$ 来表示奖励 $r(\mathbf{x},\mathbf{y})$：
+% \begin{eqnarray}
+% r(\mathbf{x},\mathbf{y}) & = & \beta \left(\log \frac{\pi_{\theta}(\mathbf{y}|\mathbf{x})}{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}|\mathbf{x})} + \log Z(\mathbf{x}) \right) \label{eq:dpo-reward-model-expression}
+% \end{eqnarray}
+
+% 这很有趣，因为我们最初试图使用奖励模型 $r(\mathbf{x},\mathbf{y})$ 来学习策略 $\pi_{\theta}(\cdot)$，但最终却得到了基于策略的奖励模型表示。给定等式 (\ref{eq:dpo-reward-model-expression}) 中定义的奖励模型，我们可以将其应用于 Bradley-Terry 模型来计算偏好概率（另见第 \ref{sec:training-reward-models} 节）：
+% \begin{eqnarray}
+% \mathrm{Pr}_{\theta}(\mathbf{y}_a \succ \mathbf{y}_b | \mathbf{x}) & = & \mathrm{Sigmoid}(r(\mathbf{x},\mathbf{y}_a)-r(\mathbf{x},\mathbf{y}_b)) \nonumber \\
+% & = & \mathrm{Sigmoid}\bigg(\beta \Big(\log \frac{\pi_{\theta}(\mathbf{y}_a|\mathbf{x})}{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}_a|\mathbf{x})} + \log Z(\mathbf{x}) \Big) - \nonumber \\
+% &    & \hspace{4.3em} \beta \Big(\log \frac{\pi_{\theta}(\mathbf{y}_b|\mathbf{x})}{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}_b|\mathbf{x})} + \log Z(\mathbf{x}) \Big) \bigg) \nonumber \\
+% & = & \mathrm{Sigmoid}\bigg( \beta \log \frac{\pi_{\theta}(\mathbf{y}_a|\mathbf{x})}{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}_a|\mathbf{x})}  - \beta \log \frac{\pi_{\theta}(\mathbf{y}_b|\mathbf{x})}{\pi_{\theta_{\mathrm{ref}}}(\mathbf{y}_b|\mathbf{x})} \bigg)
+% \end{eqnarray}
+
+% 这个公式非常优雅，因为它将奖励的差异转换为了比率函数的差异，并且我们不需要计算 $Z(\mathbf{x})$ 的值。一个直接的结果是，我们不再需要奖励模型，而只需要目标策略和参考模型来计算偏好的概率。最后，我们可以通过最小化以下 DPO 损失函数来训练目标策略
+% \begin{eqnarray}
+% \mathcal{L}_{\mathrm{dpo}}(\theta) & = & -\mathbb{E}_{(\mathbf{x},\mathbf{y}_a,\mathbf{y}_b) \sim \mathcal{D}_r} \big[ \log \mathrm{Pr}_{\theta}(\mathbf{y}_a \succ \mathbf{y}_b | \mathbf{x}) \big]
+% \end{eqnarray}
+
+% \noindent 这个损失函数的形式与 RLHF 中训练奖励模型所用的损失函数非常相似（见等式 (\ref{eq:pairwise-reward-loss-expectation})）。但需要注意的是，这里的损失函数依赖于策略的参数（即 $\theta$），而不是奖励模型的参数（即 $\phi$）。
+
+% DPO 的主要优势在于其简单性和效率。DPO 的目标非常直接——它直接针对基于偏好的反馈进行优化，而不是依赖于单独开发的奖励模型。此外，DPO 通常样本效率更高，因为它从一个固定的数据集中学习，而不需要 PPO 中使用的计算成本高昂的采样过程。这使得 DPO 成为一种流行的人类偏好对齐方法，尤其是在通过强化学习开发和应用奖励模型具有挑战性的情况下。
+
+% DPO 可以被广义地视为一种 \mindex{离线强化学习} 方法，其中训练数据是预先收集和固定的，并且没有探索过程。相比之下，像 PPO 这样的在线强化学习方法，需要通过与环境的交互（使用奖励模型作为代理）来探索新状态，也有其独特的优势。在线强化学习的好处之一是它允许智能体通过从实时反馈中学习来不断适应环境的变化。这意味着，与离线方法不同，在线方法不受预先收集数据的静态性质的限制，可以发现新的问题解决策略。此外，探索可以帮助智能体覆盖更广泛的状态-动作对，从而提高泛化能力。这对于大型语言模型可能是一个重要的优势，因为泛化被认为是应用此类大型模型的一个关键方面。

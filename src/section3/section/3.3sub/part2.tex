@@ -1,0 +1,297 @@
+
+% \subsubsection{微调数据获取}
+
+% \noindent 微调数据至关重要，因此近期许多大语言模型 (LLM) 的研究都致力于为指令微调开发各种数据集。与大多数机器学习工作一样，数据获取通常有两种方法 --- 手动数据生成和自动数据生成。
+
+% \paragraph{人工生成数据}
+
+% \noindent 一种直接的方法是招募人类标注员为感兴趣的任务创建输入-输出对。与传统 NLP 中的数据标注（例如文本分类，标注员只需根据指南为收集的文本分配标签）不同，为 LLM 创建微调数据需要更多的步骤和精力，因此更具挑战性。假设我们想为英汉机器翻译任务获取微调数据。第一步是编写一个提示模板来描述任务并清晰地格式化问题。例如，
+
+% \vspace{0.5em}
+% \begin{tcolorbox}[frame empty]
+% \begingroup
+% \renewcommand{\arraystretch}{1.0}
+% \setlength{\tabcolsep}{6pt}
+% \begin{tabular}{r l}
+% {\color{gray} \small{Instruction}} & Translate the text from English to Chinese. \\ [0.2cm]
+% {\color{gray} \small{User Input}} & $\{*\mathrm{text}*\}$  \\ [0.2cm]
+% {\color{gray} \small{Output}} & \underline{$\{*\mathrm{translation}*\}$}
+% \end{tabular}
+% \endgroup
+% \end{tcolorbox}
+% \vspace{0.5em}
+
+% 然后，我们收集源文本和目标文本对（即，中文文本及其对应的翻译），并替换变量 $\{*\mathrm{text}*\}$ 和 $\{*\mathrm{translation}*\}$ 来生成微调样本。例如，给定一对英文和中文句子
+
+% \begin{center}
+% \begin{tabular}{r c l}
+% How's the weather today? & $\to$ &  今天天气怎么样？  \\
+% \multicolumn{1}{c}{$\{*\mathrm{text}*\}$} & & \multicolumn{1}{c}{$\{*\mathrm{translation}*\}$}
+% \end{tabular}
+% \end{center}
+
+% \noindent 我们可以使用提示模板生成一个微调样本，如下所示
+
+% \vspace{0.5em}
+% \begin{tcolorbox}[frame empty]
+% \begingroup
+% \renewcommand{\arraystretch}{1.0}
+% \setlength{\tabcolsep}{6pt}
+% \begin{tabular}{r l}
+% {\color{gray} \small{Instruction}} & Translate the text from English to Chinese. \\ [0.2cm]
+% {\color{gray} \small{User Input}} & How's the weather today?  \\ [0.2cm]
+% {\color{gray} \small{Output}} & \underline{ 今天天气怎么样？ }
+% \end{tabular}
+% \endgroup
+% \end{tcolorbox}
+% \vspace{0.5em}
+
+% \noindent 即，
+% \begin{eqnarray}
+% \mathbf{x} & = & \text{将文本从英文翻译成中文。$\backslash$n 今天天气怎么样？} \nonumber \\
+% \mathbf{y} & = & \text{ 今天天气怎么样？ } \nonumber
+% \end{eqnarray}
+
+% \noindent 我们可以使用这个 $(\mathbf{x},\mathbf{y})$ 对来微调 LLM，如上一小节所述。
+
+% 这里的一个困难是，对于同一个任务，有许多不同的方式来编写提示模板，不同的人可能会制作出质量和复杂性各异的提示模板。有时，我们可能会编写指令过于复杂或冗长的提示模板。有时，我们甚至可能不确切知道目标任务是什么以及如何描述它。一个广泛采用的策略是为现有的 NLP 任务创建提示模板，因为已经有很多成熟的 NLP 问题和基准 \cite{bach-etal:2022promptsource,wang-etal:2022super,mishra-etal:2022cross}。在这种情况下，可以给标注员提供原始的任务描述和许多示例。然后，他们可以用自己的方式来表达如何提示 LLM 执行这些任务。请注意，虽然这种方法可以简化创建和编写提示的过程，但我们仍然需要标注框架和众包系统来管理工作并进行质量控制。例如，我们通常需要设计标注指南和统一的提示模板编写格式，特别是当许多标注员为同一个任务做贡献时。从现有 NLP 任务中引出提示的一个优点是，一旦提示模板开发完成，就可以很容易地使用原始任务中的已标注样本来生成提示。例如，给定一个用于英汉翻译的双语数据集，我们可以通过用该数据集中的句子对填充上述模板中的空位，轻松创建大量微调示例。
+
+% 另一种方法是直接使用互联网上自然存在的可用数据。一个常见的例子是从问答网站收集问答对，以便为开放域问答任务微调 LLM \cite{joshi-etal:2017triviaqa}。许多问答领域的基准都是以这种方式构建的，因为问题类型繁多，一小群人不可能想出所有类型的问题。相反，使用这些网站的数据可以确保 LLM 微调数据在数量和质量上达到良好或可接受的水平。
+
+% 除了利用现有资源，开发微调数据集的另一种直接方法是众包数据。一种简单的方法是允许用户输入任何问题，然后由人工给出回答，或者由 LLM 自动生成回答，再由人工进行标注和校正。因此，可以捕捉真实的用户行为，从而为大量传统 NLP 任务未涵盖的``新''问题收集输入和输出。
+
+% 与构建微调数据集相关的一个问题是，我们通常希望数据尽可能多样化。许多研究发现，增加微调数据的多样性可以提高 LLM 的鲁棒性和泛化能力。因此，在 LLM 微调数据集中引入更多样化的提示和任务引起了相当大的兴趣。我们将在第 \ref{sec:instruction-generalization} 节中进一步讨论微调的泛化问题。
+
+% \paragraph{自动生成数据}
+
+% \noindent 人工生成数据的一个局限性在于，其质量和多样性在很大程度上取决于人类的经验和创造力。因此，如果我们希望大语言模型能够处理广泛的任务，即有效执行任何指令，那么依赖人工标注数据进行大语言模型微调通常效率不高。此外，这类数据的覆盖范围可能有限，甚至可能包含标注者自身引入的偏见。另一种方法是自动生成数据。例如，我们可以通过众包收集一些问题，并使用一个经过良好微调的大语言模型来生成这些问题的答案。然后，这些问答对像往常一样被用作微调样本。这种方法虽然非常简单，但已被广泛应用于为大语言模型生成大规模微调数据。
+
+% 上述生成合成微调数据的方法与自然语言处理中用于数据增强的方法类似。如果我们有一个大语言模型，我们可以针对任何输入生成一个预测。对不同的输入重复这个过程，我们就能创建足够数量的微调样本。这种方法对于使用一个已经微调好的大语言模型来微调新的大语言模型特别有用。然而，这种方法的一个缺点是，它依赖于人工制作或收集的输入来生成数据，而这些输入可能不适合用于泛化大语言模型。在许多大语言模型应用中，一个重大的挑战来自于用户提出的大量问题和请求，其中许多问题和请求在现有的自然语言处理任务和数据集中并未涵盖。在这些情况下，不仅需要生成预测，还需要生成输入本身。
+
+% 这里我们以 \mindex{自指令} 为例，说明如何生成大语言模型微调样本 \cite{wang-etal:2023selfinstruct,honovich-etal:2023unnatural}。其思想是，我们可以提示一个大语言模型通过学习其他指令来创建一个新指令。给定这个指令，大语言模型就可以填充其他字段（例如用户输入）并生成预测。图 \ref{fig:self-instruct} 展示了自指令的示意图。下面我们简要概述所涉及的关键步骤。
+
+% \begin{figure}[!t]
+% \centering
+% \input{figures/Chapter3/figure-self-instruct}
+% \caption{自指令 \cite{wang-etal:2023self} 方法示意图。该方法维护一个指令池以及相应的输入-输出样本。最初，该池包含一些人工编写的指令和样本。每次从池中抽取几条指令。然后，提示一个 LLM 根据抽取的指令生成新的指令和样本。最后，新生成的指令和样本经过过滤后被添加到池中。}
+% \label{fig:self-instruct}
+% \end{figure}
+
+% \begin{itemize}
+% \item \vspace{0.5em} Self-instruct 算法维护一个任务池。最初，它包含一些手工制作的种子任务，每个任务都有一个指令和一个输入-输出样本。随着算法的进行，LLM 生成的指令和样本将被添加到这个池中。
+% \item \vspace{0.3em} 在每一步，都会从指令池中抽取少量指令。例如，我们可以随机选择一些人类编写的指令和一些 LLM 生成的指令，以确保多样性。
+% \item \vspace{0.3em} 然后，所选指令被用作演示示例。因此，LLM 可以从这些示例中进行上下文学习，并生成一个新的指令。下面是提示 LLM 的一个示例模板。
+
+% \vspace{0.5em}
+% \begin{tcolorbox}[frame empty]
+% \begingroup
+% \setlength{\leftskip}{2em}
+% \setlength{\rightskip}{2em}
+
+% 我们为您提供了一些执行某些任务的不同指令。请根据这些指令生成一条新的指令。
+
+% \vspace{0.2cm}
+
+% 任务 1: $\{\mathrm{instruction}1\}$
+
+% \vspace{0.2cm}
+
+% 任务 2: $\{\mathrm{instruction}2\}$
+
+% \vspace{0.2cm}
+
+% 任务 3: $\{\mathrm{instruction}3\}$
+
+% \vspace{0.2cm}
+
+% 任务 4: $\{\mathrm{instruction}4\}$
+
+% \vspace{0.2cm}
+
+% 新任务: \underline{\hspace{2em}}
+
+% \endgroup
+% \end{tcolorbox}
+% \vspace{0.5em}
+
+% \item \vspace{0.3em} 给定生成的指令，然后提示 LLM 通过填写剩余的输入字段并生成相应的输出来完成样本。下面是一个提示模板。
+
+% \vspace{0.5em}
+% \begin{tcolorbox}[frame empty]
+% \begingroup
+% \setlength{\leftskip}{2em}
+% \setlength{\rightskip}{2em}
+
+% 我们为您提供了一组输入-输出样本，每个样本都由一个指令、一个用户输入和一个输出组成。请根据这些样本生成一个新样本。
+
+% \vspace{0.2cm}
+
+% 样本 1: $\{\mathrm{instruction}1\}$
+
+% \vspace{0.1cm}
+
+% 输入: $\{\mathrm{user\text{-}input}1\}$
+
+% \vspace{0.1cm}
+
+% 输出: $\{\mathrm{output}1\}$
+
+% \vspace{0.2cm}
+
+% 样本 2: $\{\mathrm{instruction}2\}$
+
+% \vspace{0.1cm}
+
+% 输入: $\{\mathrm{user\text{-}input}2\}$
+
+% \vspace{0.1cm}
+
+% 输出: $\{\mathrm{output}2\}$
+
+% \vspace{0.2cm}
+
+% 新样本: $\{\mathrm{new\text{-}instruction}\}$
+
+% \vspace{0.1cm}
+
+% \underline{\hspace{2em}}
+
+% \endgroup
+% \end{tcolorbox}
+% \vspace{0.5em}
+
+% \item \vspace{0.3em} 这个新生成的样本会通过一些启发式规则进行检查（例如，过滤掉与池中已有的样本或指令相似的样本或指令）。如果通过检查，该样本和指令就会被添加到池中。
+% \end{itemize}
+% \vspace{0.5em}
+
+% 这个生成过程可以重复多次，以获得足够数量的微调样本。请注意，上面我们只展示了用于生成指令和微调样本的简单提示模板。当然，我们可以开发更好的模板来生成更多样化、更准确的指令和微调样本。例如，对于文本分类等某些任务，大语言模型可能倾向于产生有偏见的预测，例如，大多数生成的样本都属于同一个类别。在这种情况下，我们可以调整不同字段的生成顺序。更具体地说，我们可以用某个先验来指定输出（即类别），并提示大语言模型在给定指令和输出的情况下生成用户输入。这种方法类似于 \mindex{输入反转}，即大语言模型根据指定的输出来生成输入 \cite{longpre-etal:2023flan}。
+
+% 使用大语言模型生成的指令和微调样本已成为开发大语言模型的一种常用方法，特别是在手动开发此类数据的成本高昂，以至于大多数研究团队无法承担的情况下。在一些经过良好微调的大语言模型中，它们的微调数据集包含了一定数量的合成数据，并且这些数据已被证明是有用的 \cite{ouyang-etal:2022training,taori-etal:2023alpaca,chiang-etal:2023vicuna}。关于为大语言模型微调生成合成数据，已有进一步的研究。例如，可以通过引入进化算法来生成更多样化的指令 \cite{xu-etal:2024wizardlm}，或者在更高级的微调过程中使用合成数据作为监督信号 \cite{chen-etal:2024self}。最近，在预训练阶段使用合成数据也引起了相当大的兴趣 \cite{gunasekar-etal:2023textbooks,allal-etal:2024cosmopedia}。
+
+% 在许多应用中，一个现实世界的情景是，给定一个任务，我们可以收集或标注相对少量的微调数据，例如，我们可以聘请专家为特定领域的问答任务创建问题。但这些数据的数量和多样性通常是不够的。在这种情况下，我们可以使用自指令技术来生成更多样化的问答对，从而扩充微调数据。这提供了一种从一个种子微调样本集开始引导大语言模型的方法。请注意，使用自生成数据是一种常见的做法，并且早已在自然语言处理中得到应用。例如，这种方法已成功应用于解析和机器翻译 \cite{charniak:1997statistical,sennrich-etal:2016improving}。
+
+\subsubsection{微调数据获取}
+
+\noindent 与预训练可以方便地获取海量原始文本不同，SFT 依赖高质量的人工标注或精心筛选的指令‑响应对。数据的准确性、多样性和任务相关性直接决定了微调后模型的性能。研究表明，数万条高质量样本便足以有效激活模型的指令遵循能力，而低质量数据反而会损害模型。因此，数据的构建与审查成为 SFT 中最为耗时却最为关键的环节。微调数据的获取方式主要有人工生成和自动生成两类。
+
+\paragraph{人工生成数据}
+
+一种直接的方法是招募人类标注员为感兴趣的任务创建输入-输出对。与传统NLP标注不同，为LLM构造微调数据需要更多的步骤。首先需要设计提示模板来描述任务。例如，为英汉翻译任务可定义如下模板：
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+\begingroup
+\renewcommand{\arraystretch}{1.0}
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{r l}
+{\color{gray} \small{Instruction}} & Translate the text from English to Chinese. \\ [0.2cm]
+{\color{gray} \small{User Input}} & $\{*\mathrm{text}*\}$  \\ [0.2cm]
+{\color{gray} \small{Output}} & \underline{$\{*\mathrm{translation}*\}$}
+\end{tabular}
+\endgroup
+\end{tcolorbox}
+\vspace{0.5em}
+
+收集源文本与目标文本对（例如``How's the weather today?'' $\to$ ``今天天气怎么样？''），将变量$\{*\mathrm{text}*\}$和$\{*\mathrm{translation}*\}$替换为具体句子，即可形成微调样本：
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+\begingroup
+\renewcommand{\arraystretch}{1.0}
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{r l}
+{\color{gray} \small{Instruction}} & Translate the text from English to Chinese. \\ [0.2cm]
+{\color{gray} \small{User Input}} & How's the weather today?  \\ [0.2cm]
+{\color{gray} \small{Output}} & \underline{今天天气怎么样？}
+\end{tabular}
+\endgroup
+\end{tcolorbox}
+\vspace{0.5em}
+
+如此构造的$(\mathbf{x},\mathbf{y})$对可直接用于微调。
+
+这里的困难在于同一任务存在多种编写提示的方式，不同标注员产出的模板质量和风格各异。一种广泛采用的策略是为现有NLP任务开发提示模板\cite{bach-etal:2022promptsource,wang-etal:2022super,mishra-etal:2022cross}：标注员在了解原始任务描述和示例后，用自己的表达方式写出提示。模板确定后，利用原任务已有的标注数据便可批量生成微调样本。此外，也可直接使用互联网上的自然数据，如从问答网站收集问答对来构建开放域问答数据\cite{joshi-etal:2017triviaqa}，以保证问题类型的广覆盖。众包是另一重要途径：收集真实用户提出的问题，由人工回答或先由LLM生成再经人工修正，从而捕获传统NLP任务未涵盖的``新''问题。大量研究表明，提升微调数据的多样性有助于增强LLM的鲁棒性和泛化能力，我们将在第~\ref{sec:instruction-generalization}~节进一步讨论。
+
+\paragraph{自动生成数据}
+\label{sec:instruction-generalization}
+
+人工方法受限于标注者的经验和创造力，覆盖范围与扩展效率有限。自动生成方法中，最直接的方式是利用一个已微调好的LLM为收集到的问题批量生成答案，形成合成微调样本。为进一步解决输入本身多样性的问题，\textbf{自指令}\mindex{Self-instruct}\cite{wang-etal:2023selfinstruct,honovich-etal:2023unnatural}提供了一种系统化的方案：维护一个任务指令池，初始包含少量人工编写的种子任务及样本。每次从池中抽取若干条指令作为示例，提示LLM生成一条新的指令；随后再提示LLM为该指令生成对应的用户输入和输出，构成完整的微调样本。新样本经过启发式规则过滤（如去除与池中已有数据高度重复的样本）后加入池中，如此迭代便可扩充出大规模、多样化的微调数据集。
+
+实际应用中，生成顺序可灵活调整。例如，对于文本分类等任务，为避免LLM倾向于生成某一固定类别的伪样本，可采用\mindex{输入反转}（input reversal）策略：先指定输出的类别标签，再提示LLM生成与其匹配的输入\cite{longpre-etal:2023flan}。自指令及其变体已被广泛应用于LLM开发，Alpaca、Vicuna等模型的微调数据集均包含一定比例的合成数据\cite{ouyang-etal:2022training,taori-etal:2023alpaca,chiang-etal:2023vicuna}。后续工作进一步引入进化算法以生成更多样化的指令\cite{xu-etal:2024wizardlm}，或将合成数据用作自提升的监督信号\cite{chen-etal:2024self}；近期在预训练阶段使用合成数据同样引起了关注\cite{gunasekar-etal:2023textbooks,allal-etal:2024cosmopedia}。
+
+在只有少量种子数据的小样本场景下，自指令技术也可充当数据增强手段，从种子集出发引导LLM生成更多样本，实现数据层面的自举。这种利用模型自身生成训练数据的实践在自然语言处理中由来已久，例如早年在句法分析和统计机器翻译中便取得了显著成效\cite{charniak:1997statistical,sennrich-etal:2016improving}。
+
+
+\subsubsection{监督微调}
+
+\noindent 将前面介绍的指令微调付诸实践的最直接方式，就是\textbf{监督微调}（Supervised Fine‑Tuning, SFT）。如前所述，该方法利用已标注的输入‑输出对来调整模型参数，使模型学会根据指令生成期望的响应。本节首先对这一过程进行形式化描述，然后将其扩展到多轮对话场景，最后讨论实践中需要关注的几个关键问题。
+
+\vspace{0.5em}
+\noindent\textbf{单轮预测的形式化。}
+设输入序列为 $\mathbf{x}=x_0\dots x_m$（包含指令和用户提供的内容），对应的输出序列为 $\mathbf{y}=y_1\dots y_n$。SFT 数据集 $\mathcal{D}$ 由大量这样的 $(\mathbf{x}, \mathbf{y})$ 对所构成。下表给出了一些典型示例：
+
+\begin{center}
+\begin{tabular}{l | l}
+$\mathbf{x}$（指令 + 用户输入） & $\mathbf{y}$（输出） \\ \hline
+\colorbox{gray!30}{Summarize the following article.} & $\{*\textrm{summary}*\}$ \\
+Article: In recent years, solar energy has seen ... & \\ \hline
+\colorbox{gray!30}{Analyze the sentiment of the following review.} & Positive \\
+Review: I absolutely loved the new dining experience... & \\ \hline
+\colorbox{gray!30}{Translate the following sentence into French.} & La pratique aide \\
+Sentence: practice indeed helps. & effectivement. \\ \hline
+\colorbox{gray!30}{Classify the following email as spam or not spam.} & Spam \\
+Text: Congratulations! You've won a \$500 gift card... & \\
+\end{tabular}
+\end{center}
+
+\noindent 我们的目标是最大化在给定输入下生成正确输出的条件概率。沿用概述部分的记号，令 $\hat{\theta}$ 为预训练得到的参数，则微调后的最优参数 $\tilde{\theta}$ 由下式给出（为书写简洁，后文将用 $\theta$ 表示从 $\hat{\theta}$ 开始调整后的参数）：
+\begin{eqnarray}
+\tilde{\theta} = \argmax_{\theta} \sum_{(\mathbf{x},\mathbf{y}) \in \mathcal{D}} \log \mathrm{Pr}_{\theta}(\mathbf{y}|\mathbf{x})
+\label{eq:sft-objective}
+\end{eqnarray}
+其中 $\log \mathrm{Pr}_{\theta}(\mathbf{y}|\mathbf{x}) = \sum_{i=1}^{n} \log \mathrm{Pr}_{\theta}(y_i|\mathbf{x},\mathbf{y}_{<i})$，即只对输出部分的 token 计算交叉熵损失。
+
+与标准语言模型训练不同，这里我们不关心输入序列 $\mathbf{x}$ 自身的生成概率。在实际实现中，通常将 $[\mathbf{x}, \mathbf{y}]$ 拼接为一个完整序列进行前向传播，而在反向传播时强行将输入部分的损失设为 $0$，仅保留输出部分的梯度。这一过程可以借助链式法则清晰地表达为
+\begin{eqnarray}
+\log \mathrm{Pr}_{\theta}(\mathbf{x},\mathbf{y}) &=& \underbrace{\log \mathrm{Pr}_{\theta}(\mathbf{x})}_{\text{设为 } 0} + \underbrace{\log \mathrm{Pr}_{\theta}(\mathbf{y}|\mathbf{x})}_{\text{实际计算损失}}
+\label{eq:sft-chain}
+\end{eqnarray}
+图\ref{fig:sft-forward-backward} 给出了这种“前向计算全序列，反向仅传播输出部分”的训练方式示意图。由此可见，SFT 本质上就是一种修改了损失掩码的标准语言模型训练。
+
+\begin{figure}[!t]
+\centering
+\input{figures/Chapter3/figure-sft-forward-and-backward}
+\caption{LLM 的监督微调图示。我们将输入和输出拼接成一个单一序列。在前向传播过程中，我们照常运行 LLM。在反向传播过程中，我们仅计算输出部分的损失，而将输入部分的损失简单地设置为 0。}
+\label{fig:sft-forward-backward}
+\end{figure}
+
+\vspace{0.5em}
+\noindent\textbf{扩展到多轮对话。}
+上述单轮预测假定每次交互相互独立，但在聊天机器人等真实应用中，往往需要进行多轮对话。假设一段对话包含 $K$ 轮，每轮依次为用户输入 $\mathbf{x}^k$ 和助手回复 $\mathbf{y}^k$，整体构成序列 $\mathbf{x}^1,\mathbf{y}^1,\dots,\mathbf{x}^K,\mathbf{y}^K$。我们希望模型在每一轮都能基于已有的对话历史生成恰当的回复，即最大化
+\begin{eqnarray}
+\tilde{\theta} = \argmax_{\theta} \sum_{k=1}^{K} \log \mathrm{Pr}_{\theta}(\mathbf{y}^k|\mathbf{x}^1,\mathbf{y}^1,\dots,\mathbf{x}^k)
+\label{eq:multi-turn-obj}
+\end{eqnarray}
+
+一种朴素的实现方式是对每个 $k$ 分别运行一次 LLM，但这样做的效率极低。更高效的做法与单轮情形类似：将整个对话序列 $[\mathbf{x}^1,\mathbf{y}^1,\dots,\mathbf{x}^K,\mathbf{y}^K]$ 视为一个长序列，在单次前向传播中完成所有轮次的损失计算。应用链式法则展开：
+\begin{eqnarray}
+\log \mathrm{Pr}_{\theta}(\mathbf{x}^1,\mathbf{y}^1,\dots,\mathbf{x}^K,\mathbf{y}^K) &=& \underbrace{\log \mathrm{Pr}_{\theta}(\mathbf{x}^1)}_{\text{设为 }0} + \underbrace{\log \mathrm{Pr}_{\theta}(\mathbf{y}^1|\mathbf{x}^1)}_{\text{损失}} + \cdots \nonumber \\
+&+& \underbrace{\log \mathrm{Pr}_{\theta}(\mathbf{x}^K|\mathbf{x}^1,\mathbf{y}^1,\dots,\mathbf{y}^{K-1})}_{\text{设为 }0} \nonumber \\
+&+& \underbrace{\log \mathrm{Pr}_{\theta}(\mathbf{y}^K|\mathbf{x}^1,\mathbf{y}^1,\dots,\mathbf{x}^K)}_{\text{损失}}
+\label{eq:multi-turn-chain}
+\end{eqnarray}
+我们只需将每一处用户输入项对应的对数概率损失设为 $0$，仅计算助手回复部分的损失，便能在单次运行中达到式(\ref{eq:multi-turn-obj})所描述的目标。图\ref{fig:sft-conversational-models} 展示了多轮对话 SFT 的训练范式。最终，整体训练目标依然可以简洁地写为
+\begin{eqnarray}
+\tilde{\theta} = \argmax_{\theta} \sum_{\mathrm{seq} \in \mathcal{D}} \log \mathrm{Pr}_{\theta}(\mathrm{seq})
+\end{eqnarray}
+其中 $\mathrm{seq}$ 即上述完整对话序列，损失掩码模式保证了模型仅学习如何生成助手回复，而不会去预测用户提问。
+
+\begin{figure}[!t]
+\centering
+\input{figures/Chapter3/figure-sft-multi-round-prediction}
+\caption{对话模型的监督微调示意图。在此，LLM 充当聊天机器人，根据对话历史响应每个请求。对话在用户和聊天机器人之间交替进行。在 SFT 中，我们像在标准 LLM 中一样将整个对话视为一个序列，但仅针对 LLM 的响应计算损失。}
+\label{fig:sft-conversational-models}
+\end{figure}
+
+\vspace{0.5em}
+\noindent 总而言之，监督微调是连接通用预训练模型与具体应用场景的核心桥梁。通过精心设计单轮或多轮的指令数据，并配合合理的训练策略，我们能够高效地赋予 LLM 强大且泛化的任务解决能力。

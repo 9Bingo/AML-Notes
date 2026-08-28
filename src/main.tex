@@ -1,0 +1,267 @@
+% !TeX program = xelatex
+% Advanced Machine Learning textbook master file.
+\documentclass[UTF8,a4paper,zihao=-4,oneside,openany]{ctexbook}
+
+\usepackage[
+  top=2.6cm,
+  bottom=2.6cm,
+  left=2.7cm,
+  right=2.7cm,
+  headheight=15pt
+]{geometry}
+\usepackage{setspace}
+\setstretch{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.2em}
+\setlength{\emergencystretch}{3em}
+\sloppy
+
+\usepackage{amsmath,amssymb,bm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[normalem]{ulem}
+\usepackage[mode=tex]{standalone}
+\usepackage{import}
+
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{
+  arrows.meta,
+  automata,
+  backgrounds,
+  calc,
+  chains,
+  decorations.pathmorphing,
+  decorations.pathreplacing,
+  fillbetween,
+  fit,
+  intersections,
+  matrix,
+  patterns,
+  positioning,
+  shadows,
+  shapes,
+  shapes.arrows,
+  shapes.geometric
+}
+
+\usepackage[most]{tcolorbox}
+\usepackage{xcolor}
+\definecolor{CourseInk}{HTML}{1F2933}
+\definecolor{CourseBlue}{HTML}{24577A}
+\definecolor{CourseGreen}{HTML}{2D6A4F}
+\definecolor{CourseGold}{HTML}{A16207}
+\definecolor{CourseGray}{HTML}{F4F6F8}
+\definecolor{CourseLine}{HTML}{D9E2EC}
+\definecolor{CoursePurple}{HTML}{6D28D9}
+\definecolor{ugreen}{HTML}{2E8B57}
+\definecolor{kellygreen}{HTML}{4CBB17}
+\definecolor{lightcyan}{HTML}{D9F5F7}
+\definecolor{lightgreen}{HTML}{DFF3D8}
+\definecolor{lightpink}{HTML}{F7D9E8}
+\definecolor{lolgreen}{RGB}{103,213,181}
+\definecolor{lolorange}{RGB}{246,179,82}
+\definecolor{lolpurple}{RGB}{200,158,196}
+\definecolor{axiscolor}{HTML}{334155}
+\definecolor{positioncolor}{HTML}{2563EB}
+\definecolor{velocitycolor}{HTML}{D97706}
+\definecolor{guidecolor}{HTML}{94A3B8}
+\definecolor{positionbg}{HTML}{F5F8FF}
+\definecolor{velocitybg}{HTML}{FFF9F0}
+\definecolor{stateblue}{HTML}{2563EB}
+\definecolor{velocityteal}{HTML}{0F766E}
+\definecolor{markorange}{HTML}{EA580C}
+\definecolor{axisgray}{HTML}{374151}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\mathbbm}[1]{\mathbf{#1}}
+
+\graphicspath{
+  {section1/}{section2/}{section3/}{section4/}{section5/}
+  {section1/figures/}{section2/figures/}{section3/figures/}{section4/figures/}{section5/figures/}
+}
+
+\makeatletter
+\def\input@path{%
+  {section1/}{section2/}{section3/}{section4/}{section5/}%
+  {section1/figures/}{section2/figures/}{section3/figures/}{section4/figures/}{section5/figures/}%
+  {section1/chapters/}{section3/section/}{section5/chapters/}%
+}
+\newcommand{\AMLFigure}[2][0.96\linewidth]{%
+  \begingroup
+  \let\AtBeginDocument\@gobble
+  \def\input@path{{section4/figures/}{figures/}{./}}%
+  \input{section4/figures/figure_style.tex}%
+  \includestandalone[width=#1]{section4/figures/#2}%
+  \endgroup
+}
+\makeatother
+
+\tcbset{
+  enhanced,
+  boxrule=0.6pt,
+  arc=2mm,
+  left=3mm,
+  right=3mm,
+  top=2mm,
+  bottom=2mm,
+  breakable
+}
+
+\newtcolorbox{learninggoals}{
+  colback=CourseGray,
+  colframe=CourseBlue,
+  title=学习目标,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{importantnote}{
+  colback=white,
+  colframe=CourseGreen,
+  title=重点提示,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{examplebox}[1][]{
+  colback=white,
+  colframe=CourseGold,
+  title=例题 #1,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{exercisebox}{
+  colback=CourseGray,
+  colframe=CourseLine,
+  title=课后练习,
+  fonttitle=\bfseries\color{CourseInk}
+}
+
+\newtcolorbox{intuition}{
+  colback=CourseGray,
+  colframe=CoursePurple,
+  title=直观理解,
+  fonttitle=\bfseries
+}
+
+\newcommand{\coursename}{高级机器学习}
+\newcommand{\semester}{2026}
+\newcommand{\teacher}{授课教师}
+\newcommand{\school}{学校 / 机构名称}
+\newcommand{\lessondate}{\today}
+\newcommand{\blankline}{\par\noindent\rule{\linewidth}{0.4pt}\par}
+\newcommand{\keyword}[1]{\textbf{\color{CourseBlue}#1}}
+\newcommand{\mindex}[1]{\textit{#1}}
+\newcommand{\imageplaceholder}[2][5cm]{%
+  \fbox{%
+    \begin{minipage}[c][#1][c]{0.78\linewidth}
+      \centering
+      \textbf{图片占位}\\[0.45em]
+      {\small #2}
+    \end{minipage}%
+  }%
+}
+\newcommand{\todochen}[1]{%
+  \par\noindent
+  {\color{CourseGold}\small$\blacktriangleright$\ \textbf{[待陈丹补充 / 语音音频]}\ #1}\par}
+\newcommand{\chapterinfo}[2][]{%
+  \begin{tcolorbox}[
+    colback=CourseGray,
+    colframe=CourseLine,
+    boxrule=0.5pt,
+    arc=1.5mm,
+    left=3mm,
+    right=3mm,
+    top=1.5mm,
+    bottom=1.5mm,
+    before skip=-0.4em,
+    after skip=1.0em
+  ]
+    {\small\noindent\textbf{\color{CourseBlue}作者：}#2%
+    \if\relax\detokenize{#1}\relax
+    \else\\[0.25em]\textbf{\color{CourseBlue}参考：}#1%
+    \fi}
+  \end{tcolorbox}
+}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small 高级机器学习}
+\fancyhead[R]{\small \leftmark}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\usepackage[numbers,sort&compress]{natbib}
+\bibliographystyle{plainnat}
+
+\usepackage[
+  colorlinks=true,
+  linkcolor=CourseBlue,
+  urlcolor=CourseGreen,
+  citecolor=CourseGold
+]{hyperref}
+
+\ctexset{
+  chapter = {
+    name = {第,章},
+    number = \chinese{chapter},
+    format = \huge\bfseries\color{CourseBlue},
+    beforeskip = 0pt,
+    afterskip = 22pt
+  },
+  section = {
+    format = \Large\bfseries\color{CourseInk}
+  },
+  subsection = {
+    format = \large\bfseries\color{CourseInk}
+  }
+}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{1.5cm}
+  {\zihao{1}\bfseries\color{CourseBlue}\coursename\par}
+  \vspace{0.8cm}
+  {\zihao{3}\bfseries 教材合订版\par}
+  \vspace{1.2cm}
+  \vfill
+  \begin{tabular}{rl}
+    \textbf{教师：} & \teacher \\
+    \textbf{学期：} & \semester \\
+    \textbf{单位：} & \school \\
+    \textbf{日期：} & \lessondate \\
+  \end{tabular}
+  \vspace*{1.2cm}
+\end{titlepage}
+
+\frontmatter
+\pagestyle{plain}
+\tableofcontents
+\cleardoublepage
+
+\mainmatter
+\pagestyle{fancy}
+
+\subimport{section1/}{chapter.tex}
+\subimport{section2/}{chapter.tex}
+\subimport{section3/}{chapter.tex}
+\subimport{section4/}{chapter.tex}
+\subimport{section5/}{chapter.tex}
+
+\backmatter
+% \renewcommand{\bibname}{参考文献}
+% \addcontentsline{toc}{chapter}{参考文献}
+\bibliography{references_merged}
+
+\end{document}

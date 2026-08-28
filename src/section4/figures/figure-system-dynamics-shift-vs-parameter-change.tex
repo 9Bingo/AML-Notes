@@ -1,0 +1,92 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\ssep{1.3cm}
+\def\bsep{2.5cm}
+
+\tikzstyle{lnode} = [fig/module,minimum width=3.0cm,minimum height=0.6cm,inner sep=2pt]
+
+\begin{scope}
+\draw [-{Latex[scale=1.2]},thick] (0,0) -- (13.5,0);
+\draw [-{Latex[scale=1.2]},thick] (0,-1.5) -- (0,3.3);
+\node [anchor=north,align=right] (xlabel) at (12.8,-0.1) {\footnotesize{时间 $t$}\\[-2pt] \footnotesize{（或深度）}};
+
+\node [anchor=west,align=right] (legend1) at (0.7,3.0) {\footnotesize{动力学 $f(\mathbf{x}(t),\theta(t))$}};
+\draw [Round Cap-Round Cap,very thick,blue] (legend1.west) -- ([xshift=-0.4cm]legend1.west);
+
+\node [anchor=north west,align=right] (legend2) at ([yshift=0.1cm]legend1.south west) {\footnotesize{参数 $\theta(t)$}};
+\draw [Round Cap-Round Cap,very thick,red!80] (legend2.west) -- ([xshift=-0.4cm]legend2.west);
+
+\draw [Round Cap-Round Cap,very thick,blue,domain=0:12.1,samples=100] plot (\x,{ - 1/200 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.0)});
+\draw [Round Cap-Round Cap,very thick,red!80,domain=0:12.1,samples=100] plot (\x,{ 1/120 * (\x +3) * (\x - 5) * (\x - 11.0)});
+
+\foreach \x in {2.5}{
+\pgfmathsetmacro{\p}{ - 1/200 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5)}
+}
+
+\node [fig/caption,anchor=north] (caption) at (6.5,-2.0) {\small{(a) 系统动力学与参数随时间平滑演化}};
+
+\end{scope}
+
+\begin{scope}[yshift=-7cm]
+\draw [-{Latex[scale=1.2]},thick] (0,0) -- (13.5,0);
+\draw [-{Latex[scale=1.2]},thick] (0,-1.5) -- (0,3.3);
+\node [anchor=north,align=right] (xlabel) at (12.8,-0.1) {\footnotesize{时间 $t$}\\[-2pt] \footnotesize{（或深度）}};
+
+\node [anchor=west,align=right] (legend1) at (0.7,3.0) {\footnotesize{动力学 $f(\mathbf{x}(t),\theta(t))$}};
+\draw [Round Cap-Round Cap,very thick,blue] (legend1.west) -- ([xshift=-0.4cm]legend1.west);
+
+\node [anchor=north west,align=right] (legend2) at ([yshift=0.1cm]legend1.south west) {\footnotesize{参数 $\theta(t)$}};
+\draw [Round Cap-Round Cap,very thick,red!80] (legend2.west) -- ([xshift=-0.4cm]legend2.west);
+
+\draw [Round Cap-Round Cap,very thick,red!80] (0,1.5) -- (3,1.5);
+\draw [Round Cap-Round Cap,very thick,red!80] (3,0.2) -- (6,0.2);
+\draw [Round Cap-Round Cap,very thick,red!80] (6,-0.8) -- (9,-0.8);
+\draw [Round Cap-Round Cap,very thick,red!80] (9,-0.3) -- (12.1,-0.3);
+
+\draw [-,dashed,red!80] (3,1.5) -- (3,0.2);
+\draw [-,dashed,red!80] (6,0.2) -- (6,-0.8);
+\draw [-,dashed,red!80] (9,-0.8) -- (9,-0.3);
+
+\node [circle,minimum size=5pt,inner sep=0,fill=red!80] (ppoint1) at (3,0.2) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=red!80] (ppoint2) at (3,1.5) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=red!80] (ppoint3) at (6,0.2) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=red!80] (ppoint4) at (6,-0.8) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=red!80] (ppoint5) at (9,-0.8) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=red!80] (ppoint6) at (9,-0.3) {};
+
+\draw [Round Cap-Round Cap,very thick,blue] (0,0) .. controls +(60:2cm) and +(130:2cm) .. (3,-0.3);
+\draw [Round Cap-,very thick,blue] (3,-1.1) .. controls +(30:0.5cm) and +(140:0.5cm) .. (4.0,-1.2);
+\draw [-Round Cap,very thick,blue] (4.0,-1.2) .. controls +(-40:1.0cm) and +(-100:0.2cm) .. (6,0.7);
+\draw [Round Cap-Round Cap,very thick,blue] (6,1.2) .. controls +(70:3cm) and +(130:0.8cm) .. (9,2.2);
+\draw [Round Cap-Round Cap,very thick,blue] (9,0.9) .. controls +(-60:1cm) and +(180:0.5cm) .. (12.1,0.2);
+
+\draw [-,dashed,blue] (3,-0.3) -- (3,-1.1);
+\draw [-,dashed,blue] (6,0.7) -- (6,1.2);
+\draw [-,dashed,blue] (9,2.2) -- (9,0.9);
+
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (dpoint1) at (3,-0.3) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (dpoint2) at (3,-1.1) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (dpoint3) at (6,0.7) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (dpoint4) at (6,1.2) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (dpoint5) at (9,2.2) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (dpoint6) at (9,0.9) {};
+
+\node [anchor=north west,align=left] (changeinparam) at (3.5,1.8) {\scriptsize{参数突变}};
+\draw [->] ([yshift=0.2cm]changeinparam.south west) -- (3.1,1.0);
+
+\node [anchor=north east,align=right] (changeindyn) at (2.4,-0.6) {\scriptsize{动力学突变}};
+\draw [->] ([yshift=0.2cm]changeindyn.east) -- (2.9,-0.6);
+
+\foreach \x in {2.5}{
+\pgfmathsetmacro{\p}{ - 1/200 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5)}
+}
+
+\node [fig/caption,anchor=north] (caption) at (6.5,-2.0) {\small{(b) 参数突变导致系统动力学发生跃迁}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

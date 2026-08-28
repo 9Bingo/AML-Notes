@@ -1,0 +1,177 @@
+\begin{tikzpicture}[
+    font=\small,
+    flow/.style={
+        draw=black,
+        -Latex,
+        line width=0.8pt
+    },
+    dashedflow/.style={
+        draw=black!75,
+        -Latex,
+        dashed,
+        line width=0.75pt
+    },
+    panel/.style={
+        draw=black,
+        rounded corners=4pt,
+        line width=0.8pt
+    },
+    titlebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=blue!5,
+        minimum height=0.72cm,
+        align=center
+    },
+    stepbox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=gray!5,
+        minimum width=3.8cm,
+        minimum height=1.1cm,
+        align=center,
+        line width=0.8pt
+    },
+    actorbox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=blue!8,
+        minimum width=4.1cm,
+        minimum height=1.05cm,
+        align=center,
+        line width=0.8pt
+    },
+    criticbox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=green!8,
+        minimum width=4.1cm,
+        minimum height=1.05cm,
+        align=center,
+        line width=0.8pt
+    },
+    envbox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=orange!10,
+        minimum width=4.1cm,
+        minimum height=1.05cm,
+        align=center,
+        line width=0.8pt
+    },
+    notebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=yellow!10,
+        minimum width=5.2cm,
+        minimum height=1.0cm,
+        align=center,
+        line width=0.8pt
+    },
+    comparebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=gray!8,
+        minimum width=5.4cm,
+        minimum height=1.8cm,
+        align=left,
+        line width=0.8pt
+    }
+]
+
+% =========================
+% Outer panel
+% =========================
+\draw[panel, fill=white] (0.2,0.3) rectangle (18.7,11.2);
+\node[titlebox, minimum width=5.4cm] at (9.45,11.7) {PPO 的策略更新与样本重复利用过程};
+
+% =========================
+% Main steps
+% =========================
+\node[actorbox] (s1) at (3.0,9.7) {
+    第 1 步\\
+    固定当前策略\\
+    $\theta \rightarrow \theta_{\mathrm{old}}$
+};
+
+\node[envbox] (s2) at (9.45,9.7) {
+    第 2 步\\
+    使用旧策略与环境交互\\
+    采集状态、动作、奖励数据
+};
+
+\node[criticbox] (s3) at (15.8,9.7) {
+    第 3 步\\
+    Critic 计算价值估计\\
+    得到回报和优势 $\widehat{A}_t$
+};
+
+\node[stepbox] (s4) at (3.0,6.9) {
+    第 4 步\\
+    将采集到的数据\\
+    划分为多个小批次
+};
+
+\node[stepbox] (s5) at (9.45,6.9) {
+    第 5 步\\
+    基于裁剪目标\\
+    更新 Actor
+};
+
+\node[criticbox] (s6) at (15.8,6.9) {
+    第 6 步\\
+    更新 Critic\\
+    提高价值估计精度
+};
+
+\node[notebox] (s7) at (9.45,4.4) {
+    对同一批数据重复训练 $K$ 轮\\
+    每一轮都使用裁剪目标限制策略变化
+};
+
+\node[actorbox] (s8) at (9.45,1.9) {
+    第 7 步\\
+    完成本轮更新后\\
+    用新策略重新采样数据
+};
+
+% =========================
+% Main arrows
+% =========================
+\draw[flow] (s1.east) -- (s2.west);
+\draw[flow] (s2.east) -- (s3.west);
+
+\draw[flow] (s3.south west) .. controls (14.0,8.5) and (4.8,8.2) .. (s4.north east);
+\draw[flow] (s4.east) -- (s5.west);
+\draw[flow] (s5.east) -- (s6.west);
+
+\draw[flow] (s6.south west) .. controls (14.0,5.6) and (11.7,5.0) .. (s7.north east);
+\draw[flow] (s7.south) -- (s8.north);
+
+% =========================
+% Reuse loop
+% =========================
+\draw[dashedflow]
+    (s7.west)
+    .. controls (4.8,4.4) and (4.8,6.0)
+    .. node[midway, above] {\footnotesize 重复 $K$ 轮} (s4.south);
+
+% =========================
+% Comparison note
+% =========================
+\node[comparebox] at (3.5,2.1) {
+\textbf{与 A2C 的区别：}\\
+A2C：采集一批数据后通常只更新一次\\
+PPO：采集一批数据后可划分小批次并重复更新多轮
+};
+
+% =========================
+% Small note
+% =========================
+\node[comparebox, minimum width=5.0cm, minimum height=1.6cm] at (15.1,2.1) {
+\textbf{核心原因：}\\
+裁剪目标限制单次策略更新幅度\\
+因此同一批样本可以在一定范围内重复利用
+};
+
+\end{tikzpicture}

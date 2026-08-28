@@ -1,0 +1,187 @@
+\noindent 指令微调让大语言模型能够适应那些可被清晰定义的任务，这类问题本质上属于\mindex{alignment}问题。对齐，就是引导模型的行为以符合人类意图，我们期望模型不仅能遵循指令，还要做到无偏见、真实且无害。例如，一个负责任的模型应当拒绝回答“如何制造武器”这类有害请求。与对齐紧密相关的是人工智能安全，其目标在于构建安全且有益的智能系统，确保系统在正常使用乃至被滥用或恶意攻击的情况下，都能保持鲁棒、安全，且行为符合人类的主观预期。对齐之所以困难，是因为人类价值观复杂多样且不断变化，有时我们只有看到模型的回应，才能判断它是否符合期望。因此，对齐不单是针对预设任务的微调，更是一个需要模型与真实世界不断交互、持续学习的宏大问题。
+
+在大规模无标签数据上完成预训练后，对齐通常会经历两个步骤：
+\begin{itemize}
+\item \vspace{0.5em} \mindex{监督微调} (\mindex{SFT})。使用新的、面向特定任务的标注数据继续训练模型。最常用的技术是指令微调，使模型与“遵循指令”这一预期行为对齐。
+\item \vspace{0.3em} \mindex{从人类反馈中学习}。即使经过监督微调，模型仍可能生成不真实、有偏见或有害的内容。此时可以收集人类对模型输出的评估反馈，并利用这些反馈进一步训练模型，实现更深层的对齐。
+\end{itemize}
+\vspace{0.5em}
+
+一种主流的从人类反馈中学习的方法，是将其当作一个强化学习问题，称为\mindex{reinforcement learning from human feedback} (\mindex{RLHF})。该方法包含两个组件：
+\begin{itemize}
+\item \vspace{0.5em} \mindex{Agent}。“智能体”就是我们要训练的大语言模型。它从环境接收文本，并输出另一段文本返回给环境，其策略由模型本身的分布定义：$\Pr(\mathbf{y} | \mathbf{x})$。
+\item \vspace{0.3em} \mindex{Reward Model}。奖励模型充当了环境的替身，它负责对智能体生成的输出序列给出一个数值奖励，以此表征输出的好坏。
+\end{itemize}
+\vspace{0.5em}
+RLHF 涉及两个学习任务：一、利用人类反馈训练奖励模型；二、在奖励模型的指导下，用强化学习算法优化策略。关键步骤可以归纳为：a) 通过预训练和指令微调获得初始策略；b) 为每个输入生成多个候选输出，并收集人类对这些输出的偏好排序；c) 基于排序结果学习奖励模型；d) 以奖励模型为监督信号，对策略进行强化学习微调。图\ref{fig:llm-rlhf-overview} 展示了这一流程。
+
+
+\begin{figure}[!t]
+\centering
+\input{figures/Chapter4/figure-rlhf-overview}
+\caption{RLHF 概述。其中涉及 4 个关键步骤：a) 使用预训练和监督微调训练初始 LLM（即策略）；b) 通过对 LLM 的输出进行排序来收集人类偏好数据；c) 使用排序结果训练奖励模型；d) 基于奖励模型对策略进行 RL 微调。双线箭头表示训练或微调。}
+\label{fig:llm-rlhf-overview}
+\end{figure}
+
+下面我们通过一个具体的例子来理解 RLHF 的基本思想。假设我们已有一个经过预训练和指令微调的大语言模型，用户输入：
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+\begin{center}
+\parbox{0.9\textwidth}
+{
+怎样才能更环保地生活？
+}
+\end{center}
+\end{tcolorbox}
+\vspace{0.5em}
+模型通过采样生成了4个不同的回答：
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+\begin{center}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{p{0.22\textwidth} p{0.72\textwidth}}
+输出1 ($\mathbf{y}_1$): & 考虑改用电动汽车或自行车代替传统汽车，以减少碳排放，保护我们的星球。 \\
+输出2 ($\mathbf{y}_2$): & 尝试极简主义生活方式，减少所拥有的物品，从而降低消费以及制造和处置带来的环境影响。 \\
+输出3 ($\mathbf{y}_3$): & 脱离电网，自己用可再生能源发电并收集雨水，实现完全自给自足，摆脱对不可再生资源的依赖。 \\
+输出4 ($\mathbf{y}_4$): & 多支持本地农产品，这既能减少食品长途运输的碳足迹，又能享受新鲜健康的食物。
+\end{tabular}
+\end{center}
+\end{tcolorbox}
+\vspace{0.5em}
+让标注者直接为每个输出打出绝对分数往往比较困难，但对他们来说，判断输出之间的相对优劣则要容易得多。于是可以得到一个偏好排序，例如：
+\begin{equation}
+\mathbf{y}_1 \succ \mathbf{y}_4 \succ \mathbf{y}_2 \succ \mathbf{y}_3 \nonumber
+\end{equation}
+利用这类排序数据，我们便可以训练奖励模型。奖励模型通常采用与目标大语言模型相似但规模更小的架构。给定输入$\mathbf{x}$和输出$\mathbf{y}_k$，将它们拼接成一个序列$\mathrm{seq}_k = [\mathbf{x},\mathbf{y}_k]$，并在末尾添加一个特殊符号（如$\langle \backslash s \rangle$），然后取 Transformer 最顶层该符号位置的输出作为整个序列的表示，最后经过一个线性层得到奖励分数$R(\mathbf{x},\mathbf{y}_k)$。训练时常采用成对排序损失：
+\begin{eqnarray}
+\mathrm{Loss}_{\omega}(\mathcal{D}_r) = -\mathbb{E}_{(\mathbf{x},\mathbf{y}_{k_1},\mathbf{y}_{k_2}) \sim \mathcal{D}_r} \log(\mathrm{Sigmoid}(R_{\omega}(\mathbf{x},\mathbf{y}_{k_1}) - R_{\omega}(\mathbf{x},\mathbf{y}_{k_2})))
+\end{eqnarray}
+其中$\omega$为奖励模型参数，$\mathcal{D}_r$是由输入和输出对构成的偏好数据集。如果模型预测的排序与人类标注不一致，该损失就会施加惩罚。通过最小化这一损失，我们得到奖励模型$R_{\hat{\omega}}(\cdot)$，它可以为任意输入-输出对提供连续的奖励分数，成为后续策略学习的监督信号。
+
+在策略学习阶段，一个直接的目标是最大化期望奖励：
+\begin{eqnarray}
+\tilde{\theta} = \argmax_{\hat{\theta}^+} \mathbb{E}_{(\mathbf{x},\mathbf{y}_{\hat{\theta}^+}) \sim \mathcal{D}_{\mathrm{rlft}}} R_{\hat{\omega}}(\mathbf{x},\mathbf{y}_{\hat{\theta}^+})
+\end{eqnarray}
+其中$\mathbf{x}$从输入数据集中采样，$\mathbf{y}_{\hat{\theta}^+}$则从当前策略分布$\mathrm{Pr}_{\hat{\theta}^+}(\mathbf{y}|\mathbf{x})$中采样。实践中通常会采用更高级的强化学习算法，如\mindex{proximal policy optimization} (\mindex{PPO})，以获得更稳定的训练效果，详细算法将在后续章节展开。
+
+% 为什么不直接将偏好学习视为标准监督学习问题？因为要让标注者精确描述人类的价值观，并给出完美对齐的输出，往往异常困难；相比之下，对已有输出进行偏好排序就简单得多。RLHF 通过学习奖励模型来捕捉人类偏好，再用它来指导策略训练，尤其适用于那些“演示难、评判易”的场景。此外，强化学习的探索机制还能让模型发现标注数据之外的潜在有益策略，从而进一步提升对齐效果。
+
+
+% \noindent 指令微调提供了一种简单的方法，使大语言模型能够适应可以被明确定义的任务。这个问题可以被广泛地归类为一个 \mindex{alignment} 问题。在这里，对齐指的是引导大语言模型的行为以符合人类意图的过程。这种引导可以来自标记数据、人类反馈或任何其他形式的人类偏好。例如，我们希望大语言模型不仅能准确地遵循指令，还要做到无偏见、真实和无害。因此，我们需要监督模型，使其符合人类的价值观和期望。一个常见的例子是，当我们询问一个大语言模型如何制造武器时，如果它没有经过仔细的对齐，它可能会提供一份关键步骤的清单。然而，一个负责任的模型应该能够识别并避免回应有害或非法信息的请求。在这种情况下，对齐对于确保大语言模型以负责任的方式并根据道德准则行事至关重要。
+
+% 与对齐相关的一个概念是人工智能安全。人工智能的一个终极目标是构建安全且对社会有益的智能系统。为了实现这一目标，我们应确保这些系统在任何现实世界使用条件下，甚至在滥用或恶意使用的情况下，都能保持鲁棒、安全和主观。对于大语言模型，可以通过适当的人类指导来提高其安全性，例如人类标记的数据以及在应用过程中与用户的互动。
+
+% 对齐是困难的，因为人类的价值观和期望是多样且不断变化的。有时，我们很难精确地描述人类想要什么，除非我们看到大语言模型对用户请求的响应。这使得对齐不再是在预定义任务上调整大语言模型的问题，而是一个更大的问题，即通过与现实世界的互动来训练它们。
+
+% 由于对控制人工智能系统的担忧，关于大语言模型对齐问题的研究激增。通常，在大语言模型在大规模无标签数据上进行预训练后，会采用两个对齐步骤。
+
+% \begin{itemize}
+% \item \vspace{0.5em} \mindex{监督微调} (\mindex{SFT})。这涉及在新的、面向任务的、有标记的数据上继续训练预训练的 LLM。一种常用的 SFT 技术是指令微调。如前一小节所述，通过从指令-响应标注数据中学习，LLM 可以与遵循指令的预期行为对齐，从而能够执行各种指令描述的任务。监督微调可以看作是遵循预训练+微调的范式，并为适配 LLM 提供了一种相对直接的方法。
+% \item \vspace{0.3em} \mindex{从人类反馈中学习}。在 LLM 完成预训练和监督微调后，如果给予适当的提示，它就可以用来响应用户的请求。但该模型可能会生成不真实、有偏见或有害的内容。为了使 LLM 与用户更加对齐，一种简单的方法是直接从人类反馈中学习。例如，给定用户提供的一些指令和输入，专家被要求根据他们的偏好和兴趣来评估模型的响应情况。然后，这些反馈被用来进一步训练 LLM，以实现更好的对齐。
+% \end{itemize}
+% \vspace{0.5em}
+
+% 一种从人类反馈中学习的典型方法是将其视为一个强化学习 (RL) 问题，称为 \mindex{reinforcement learning from human feedback} (\mindex{RLHF}) \cite{ouyang-etal:2022training}。RLHF 方法最初是为了解决一般的序列决策问题而提出的 \cite{christiano-etal:2017deep}，后来成功地应用于 GPT 系列模型的开发中 \cite{stiennon-etal:2020learning}。作为一种强化学习方法，RLHF 的目标是通过最大化从环境中获得的某种奖励来学习一个策略。具体来说，RLHF 中构建了两个组件：
+
+% \begin{itemize}
+% \item \vspace{0.5em} \mindex{Agent}。 ``智能体'' (agent)，也称为 LM ``智能体''，是我们想要训练的 LLM。该``智能体''通过与环境交互来运作：它从环境中接收一段文本，并输出另一段文本返回给环境。``智能体''的策略是由 LLM 定义的函数，即 $\Pr(\mathbf{y} | \mathbf{x})$。
+% \item \vspace{0.3em} \mindex{Reward Model}。 奖励模型是环境的代理。每当``智能体''生成一个输出序列时，奖励模型都会为该输出序列分配一个数值分数 (即奖励)。这个分数告诉``智能体''输出序列的好坏程度。
+% \end{itemize}
+% \vspace{0.5em}
+
+% 在 RLHF 中，我们需要执行两个学习任务：1) 奖励模型学习，即利用人类对智能体输出的反馈来训练奖励模型；2) 策略学习，即使用强化学习算法，在奖励模型的指导下优化策略。以下是 RLHF 所涉及关键步骤的简要概述。
+
+% \begin{itemize}
+% \item \vspace{0.5em} 使用预训练和指令微调构建初始策略。
+% \item \vspace{0.3em} 使用该策略为每个输入生成多个输出，然后收集关于这些输出的人类反馈（例如，对输出进行比较）。
+% \item \vspace{0.3em} 从人类反馈中学习奖励模型。
+% \item \vspace{0.3em} 在奖励模型的监督下微调策略。
+% \end{itemize}
+% \vspace{0.5em}
+
+% 图 \ref{fig:llm-rlhf-overview} 展示了 RLHF 的概览。鉴于本节仅作为大语言模型概念的简要介绍，将不包括对 RLHF 技术的详细讨论。我们将通过一个简单的例子来说明 RLHF 背后的基本思想。
+
+% \begin{figure}[!t]
+% \centering
+% \input{figures/Chapter4/figure-rlhf-overview}
+% \caption{RLHF 概述。其中涉及 4 个关键步骤：a) 使用预训练和监督微调来训练一个初始 LLM（即策略）；b) 通过对 LLM 的输出进行排序来收集人类偏好数据；c) 使用排序结果训练一个奖励模型；d) 基于该奖励模型对策略进行 RL 微调。双线箭头表示训练或微调。}
+% \label{fig:llm-rlhf-overview}
+% \end{figure}
+
+% 假设我们已经通过预训练和指令微调训练好了一个大语言模型。这个大语言模型被部署用于响应用户的请求。例如，用户可能会输入
+
+% \vspace{0.5em}
+% \begin{tcolorbox}[frame empty]
+% \begin{center}
+% \parbox{0.9\textwidth}
+% {
+% How can I live a more environmentally friendly life?
+% }
+% \end{center}
+% \end{tcolorbox}
+% \vspace{0.5em}
+
+% 我们使用这个大语言模型通过对输出空间进行采样来生成 4 个不同的输出（表示为 $\{\mathbf{y}_1, ..., \mathbf{y}_4\}$）
+
+% \vspace{0.5em}
+% \begin{tcolorbox}[frame empty]
+% \begin{center}
+% \parbox{0.9\textwidth}
+% {
+
+% \begingroup
+% \setlength{\tabcolsep}{1pt}
+% \begin{tabular}{L{0.18\textwidth} L{0.74\textwidth} }
+% Output 1 ($\mathbf{y}_1$): & Consider switching to an electric vehicle or bicycle instead of traditional cars to reduce carbon emissions and protect our planet. \\
+% Output 2 ($\mathbf{y}_2$): & Adopt a minimalist lifestyle. Own fewer possessions to reduce consumption and the environmental impact of manufacturing and disposal. \\
+% Output 3 ($\mathbf{y}_3$): & Go off-grid. Generate your own renewable energy and collect rainwater to become completely self-sufficient and reduce reliance on non-renewable resources. \\
+% Output 4 ($\mathbf{y}_4$): & Support local farm products to reduce the carbon footprint of transporting food, while enjoying fresh, healthy food.
+% \end{tabular}
+% \endgroup
+
+% }
+% \end{center}
+% \end{tcolorbox}
+% \vspace{0.5em}
+
+% 然后，我们要求标注员评估这些输出。一种直接的方法是为每个输出分配一个评级分数。在这种情况下，奖励模型学习问题可以被构建为训练一个回归模型的任务。但为大语言模型的输出给出数值分数对标注员来说并非易事。通常很难设计一个所有标注员都能认同并轻松遵循的标注标准。另一种在大语言模型开发中更流行的方法是对这些输出进行排序。例如，上述输出的一个可能排序是
+% \begin{equation}
+% \mathbf{y}_1  \succ \mathbf{y}_4 \succ \mathbf{y}_2 \succ \mathbf{y}_3 \nonumber
+% \end{equation}
+
+% 然后使用这个排序结果来训练一个奖励模型。通常，RLHF 中的奖励模型是一个语言模型，它与目标大语言模型共享相同的架构，但模型尺寸更小。给定输入 $\mathbf{x}$ 和输出 $\mathbf{y}_k$，我们将它们连接起来形成一个序列 $\mathrm{seq}_k = [\mathbf{x},\mathbf{y}_k]$。这个序列使用强制解码从左到右进行处理。由于在语言建模中，每个位置只能访问其左侧的上下文，因此最顶层 Transformer 层在第一个位置的输出不能用作序列的表示。取而代之的是，在序列的末尾添加一个特殊符号（例如 $\langle \backslash s \rangle$），并且 Transformer 层堆栈的相应输出被视为整个序列的表示。在这个表示之上构建一个输出层，例如一个线性变换层，以生成奖励，表示为 $R(\mathrm{seq}_k)$ 或 $R(\mathbf{x},\mathbf{y}_k)$。
+
+% 我们使用排序损失来训练这个奖励模型。例如，一个成对排序损失函数可以写成如下形式
+% \begin{eqnarray}
+% \mathrm{Loss}_{\omega}(\mathcal{D}_r) & = & -\mathbb{E}_{(\mathbf{x},\mathbf{y}_{k_1},\mathbf{y}_{k_2}) \sim \mathcal{D}_r} \log(\mathrm{Sigmoid}(R_{\omega}(\mathbf{x},\mathbf{y}_{k_1}) - R_{\omega}(\mathbf{x},\mathbf{y}_{k_2})))
+% \end{eqnarray}
+
+% \noindent 其中 $\omega$ 表示奖励模型的参数，$\mathcal{D}_r$ 表示一个由输入和一对输出组成的元组集合。$(\mathbf{x},\mathbf{y}_{k_1},\mathbf{y}_{k_2}) \sim \mathcal{D}_r$ 是一个采样操作，它以一定的概率从 $\mathcal{D}_r$ 中抽取一个样本 $(\mathbf{x},\mathbf{y}_{k_1},\mathbf{y}_{k_2})$。举个例子，假设我们首先以均匀分布抽取一个模型输入 $\mathbf{x}$，然后以给定 $\mathbf{x}$ 的条件下 $\mathbf{y}_{k_1} \succ \mathbf{y}_{k_2}$ 的概率（表示为 $\Pr(\mathbf{y}_{k_1} \succ \mathbf{y}_{k_2} | \mathbf{x})$）抽取一对模型输出。相应的损失函数由下式给出
+% \begin{eqnarray}
+% &   & \mathrm{Loss}_{\omega}(\mathcal{D}_r) \nonumber \\
+% & = & -\sum \Pr(\mathbf{x}) \cdot \Pr(\mathbf{y}_{k_1} \succ \mathbf{y}_{k_2} | \mathbf{x}) \cdot \log(\mathrm{Sigmoid}(R_{\omega}(\mathbf{x},\mathbf{y}_{k_1}) - R_{\omega}(\mathbf{x},\mathbf{y}_{k_2}))) \nonumber \\
+% & = & -\frac{1}{K} \sum \Pr(\mathbf{y}_{k_1} \succ \mathbf{y}_{k_2} | \mathbf{x}) \cdot \log(\mathrm{Sigmoid}(R_{\omega}(\mathbf{x},\mathbf{y}_{k_1}) - R_{\omega}(\mathbf{x},\mathbf{y}_{k_2})))
+% \end{eqnarray}
+
+% \noindent 其中 $K$ 表示采样中涉及的模型输入数量。虽然这些函数的形式可能看起来很复杂，但它们的思想很简单：如果模型预测的两个输出的排序与人类标记的排序不同，我们就惩罚模型。相反，如果预测的排序与人类标记的排序匹配，模型则会获得奖励。
+
+% 我们可以通过最小化上述排序损失来训练奖励模型
+% \begin{eqnarray}
+% \hat{\omega} & = & \argmin_{\omega} \mathrm{Loss}_{\omega}(\mathcal{D}_r)
+% \end{eqnarray}
+
+
+% \noindent 得到的模型 $R_{\hat{\omega}}(\cdot)$ 可以用来评估任何给定的输入和输出对。请注意，尽管奖励模型是使用基于排序的目标进行训练的，但它被用于评分。这使得它能够提供连续的监督信号，这对于训练其他模型非常有益。
+
+% 我们现在转向策略学习问题。一个通常采用的目标是在一组输入-输出对上最大化奖励，得到一个用于强化学习微调的简单训练目标
+% \begin{eqnarray}
+% \tilde{\theta} & = & \argmax_{\hat{\theta}^+} \mathbb{E}_{(\mathbf{x},\mathbf{y}_{\hat{\theta}^+}) \sim \mathcal{D}_{\mathrm{rlft}}} R_{\hat{\omega}}(\mathbf{x},\mathbf{y}_{\hat{\theta}^+})
+% \end{eqnarray}
+
+% \noindent 其中，最优参数 $\tilde{\theta}$ 是通过微调预训练参数 $\hat{\theta}$ 得到的。$\mathcal{D}_{\mathrm{rlft}}$ 是强化学习微调数据集。对于每个样本 $(\mathbf{x},\mathbf{y}_{\hat{\theta}^+})$，$\mathbf{x}$ 从一个准备好的输入序列数据集中采样，而 $\mathbf{y}_{\hat{\theta}^+}$ 则从策略给出的分布 $\mathrm{\Pr}_{\hat{\theta}^+}(\mathbf{y}|\mathbf{x})$ 中采样。
+
+% 在实践中，通常使用更高级的强化学习算法，例如 \mindex{proximal policy optimization} (\mindex{PPO})，以实现更稳定的训练和更好的性能。我们将强化学习算法的详细讨论留到本书的后续部分，在这些部分中，RLHF 被广泛用于对齐。
+
+% 这里出现了一个有趣的问题：为什么不将从人类偏好中学习视为一个标准的监督学习问题呢？这个问题与我们前面关于数据标注困难的讨论密切相关。通常，描述人类的价值观和目标是具有挑战性的，而让人类提供完全对齐的输出则更加困难。作为一种替代方案，标注给定模型输出列表的偏好提供了一个更简单的任务。通过这样做，我们可以创建一个理解人类偏好的模型，然后该模型可以用作训练策略的奖励模型。从机器学习的角度来看，RLHF 对于那些智能体的期望行为难以展示但易于被人类识别的场景特别有用。RLHF 的另一个优点是它能够探索样本空间。通过采用采样技术，用强化学习训练的模型可以超越带标注的数据集，去探索额外的样本。这种探索能力使得 RLHF 能够发现那些仅从标记数据中不易察觉的潜在有益策略。
+
+

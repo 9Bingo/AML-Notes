@@ -1,0 +1,184 @@
+\begin{tikzpicture}[
+    font=\small,
+    flow/.style={
+        draw=black,
+        -Latex,
+        line width=0.8pt
+    },
+    dashedflow/.style={
+        draw=black!70,
+        -Latex,
+        dashed,
+        line width=0.75pt
+    },
+    panel/.style={
+        draw=black,
+        rounded corners=5pt,
+        line width=0.8pt
+    },
+    titlebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=blue!6,
+        minimum height=0.72cm,
+        align=center,
+        line width=0.8pt
+    },
+    agentbox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=blue!9,
+        minimum width=3.8cm,
+        minimum height=1.15cm,
+        align=center,
+        line width=0.8pt
+    },
+    envbox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=orange!10,
+        minimum width=3.8cm,
+        minimum height=1.15cm,
+        align=center,
+        line width=0.8pt
+    },
+    databox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=green!8,
+        minimum width=4.3cm,
+        minimum height=1.25cm,
+        align=center,
+        line width=0.8pt
+    },
+    trainbox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=purple!7,
+        minimum width=4.3cm,
+        minimum height=1.2cm,
+        align=center,
+        line width=0.8pt
+    },
+    resultbox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=yellow!12,
+        minimum width=4.3cm,
+        minimum height=1.15cm,
+        align=center,
+        line width=0.8pt
+    },
+    notebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=gray!6,
+        minimum width=6.7cm,
+        minimum height=1.15cm,
+        align=center,
+        line width=0.8pt
+    }
+]
+
+% ==================================================
+% Overall title
+% ==================================================
+% \node[titlebox, minimum width=8.0cm] at (9.3,10.9)
+% {在线强化学习与离线强化学习的数据使用方式};
+
+% ==================================================
+% Left panel: online RL
+% ==================================================
+\draw[panel, fill=blue!2] (0.3,1.1) rectangle (8.8,10.2);
+
+\node[titlebox, minimum width=4.8cm] at (4.55,9.65)
+{\textbf{在线强化学习}};
+
+\node[agentbox] (online-agent) at (4.55,7.9)
+{
+当前策略 $\pi_{\theta}$\\[0.05cm]
+根据棋盘状态选择落子
+};
+
+\node[envbox] (online-env) at (4.55,5.55)
+{
+环境交互\\[0.05cm]
+完成新的五子棋对弈
+};
+
+\node[databox] (online-data) at (4.55,3.2)
+{
+新交互数据\\[0.05cm]
+$(s_t,a_t,r_t,s_{t+1})$
+};
+
+% Main online loop
+\draw[flow] (online-agent.south) --
+node[right, align=left] {\footnotesize 执行动作 $a_t$}
+(online-env.north);
+
+\draw[flow] (online-env.south) --
+node[right, align=left] {\footnotesize 返回奖励和新状态}
+(online-data.north);
+
+\draw[flow]
+(online-data.west)
+.. controls (1.05,3.2) and (1.05,7.9)
+.. node[left, align=center] {\footnotesize 使用新数据\\[-0.05cm]\footnotesize 更新策略}
+(online-agent.west);
+
+\node[notebox, minimum width=6.6cm] at (4.55,1.75)
+{
+策略更新后重新进入环境\\
+训练数据会随当前策略不断变化
+};
+
+% ==================================================
+% Right panel: offline RL
+% ==================================================
+\draw[panel, fill=green!2] (9.3,1.1) rectangle (18.3,10.2);
+
+\node[titlebox, minimum width=4.8cm] at (13.8,9.65)
+{\textbf{离线强化学习}};
+
+\node[databox, minimum width=5.1cm] (offline-data) at (13.8,8.0)
+{
+固定历史数据集 $\mathcal{D}$\\[0.05cm]
+棋盘状态、落子、奖励和后续状态
+};
+
+\node[trainbox, minimum width=5.1cm] (offline-train) at (13.8,5.7)
+{
+离线训练\\[0.05cm]
+学习价值函数与目标策略
+};
+
+\node[resultbox, minimum width=5.1cm] (offline-policy) at (13.8,3.4)
+{
+目标策略 $\pi_{\theta}$\\[0.05cm]
+部署后根据状态选择动作
+};
+
+\draw[flow] (offline-data.south) --
+node[right, align=left] {\footnotesize 从固定数据集中采样}
+(offline-train.north);
+
+\draw[flow] (offline-train.south) --
+node[right, align=left] {\footnotesize 参数优化}
+(offline-policy.north);
+
+\node[notebox, minimum width=7.0cm] at (13.8,1.75)
+{
+训练期间不再进入环境采集新数据\\
+能够学习的内容受历史数据覆盖范围限制
+};
+
+% ==================================================
+% Contrast annotation in the middle
+% ==================================================
+\draw[dashedflow]
+(8.85,7.95) --
+node[above, align=center] {\footnotesize 数据来源不同}
+(9.25,7.95);
+
+\end{tikzpicture}

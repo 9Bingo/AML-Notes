@@ -1,0 +1,147 @@
+\begin{tikzpicture}[
+    font=\small,
+    flow/.style={
+        draw=black,
+        -Latex,
+        line width=0.8pt
+    },
+    dashedflow/.style={
+        draw=black!80,
+        -Latex,
+        dashed,
+        line width=0.75pt
+    },
+    panel/.style={
+        draw=black,
+        rounded corners=4pt,
+        line width=0.8pt
+    },
+    titlebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=blue!5,
+        minimum height=0.72cm,
+        align=center
+    },
+    infobox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=gray!6,
+        minimum width=4.2cm,
+        minimum height=1.05cm,
+        align=center,
+        line width=0.8pt
+    },
+    rowbox/.style={
+        draw=black,
+        rounded corners=4pt,
+        minimum width=5.2cm,
+        minimum height=1.95cm,
+        align=left,
+        line width=0.8pt
+    },
+    pospanel/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=green!6,
+        line width=0.8pt
+    },
+    negpanel/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=red!5,
+        line width=0.8pt
+    }
+]
+
+% =========================
+% Left panel
+% =========================
+\draw[panel, fill=orange!8] (0.2,3.8) rectangle (5.5,10.4);
+\node[titlebox, minimum width=4.2cm] at (2.85,10.9) {旧策略与裁剪区间};
+
+\node[infobox] at (2.85,9.55) {
+    旧策略\\[0.06cm]
+    $\pi_{\theta_{\mathrm{old}}}(B\mid s_t)=0.40$
+};
+
+\node[infobox] at (2.85,7.8) {
+    裁剪阈值\\[0.06cm]
+    $\epsilon=0.2$
+};
+
+\node[infobox] at (2.85,6.05) {
+    概率比值允许范围\\[0.06cm]
+    $[1-\epsilon,1+\epsilon]=[0.8,1.2]$
+};
+
+\node[infobox, minimum width=4.4cm, minimum height=1.35cm] at (2.85,4.5) {
+    裁剪限制的是\\[0.05cm]
+    过大概率变化带来的\\[0.05cm]
+    目标函数收益
+};
+
+% arrows to two cases
+\draw[flow] (5.65,8.6) -- (6.8,8.9);
+\draw[flow] (5.65,5.6) -- (6.8,5.3);
+
+% =========================
+% Top right panel: positive advantage
+% =========================
+\draw[pospanel] (6.9,7.25) rectangle (18.1,10.4);
+\node[titlebox, minimum width=4.8cm] at (12.5,10.9) {正优势动作 $\widehat{A}_t>0$};
+
+\draw[rowbox, fill=white] (7.3,8.05) rectangle (12.2,9.8);
+\node[anchor=west, align=left] at (7.55,9.45) {
+新策略概率：$0.48$\\
+概率比值：$r_t(\theta)=0.48/0.40=1.20$\\
+位于上界\\
+允许提高动作概率
+};
+
+\draw[rowbox, fill=green!12] (12.8,8.05) rectangle (17.7,9.8);
+\node[anchor=west, align=left] at (13.05,9.45) {
+新策略概率：$0.60$\\
+概率比值：$r_t(\theta)=0.60/0.40=1.50$\\
+超出上界 $1.20$\\
+裁剪后按 $1.20$ 计算收益
+};
+
+\node[text=green!40!black] at (9.75,7.55) {\footnotesize 适度提高概率};
+\node[text=green!40!black] at (15.25,7.55) {\footnotesize 过大变化不再获得额外鼓励};
+
+% =========================
+% Bottom right panel: negative advantage
+% =========================
+\draw[negpanel] (6.9,3.8) rectangle (18.1,6.95);
+\node[titlebox, minimum width=4.8cm] at (12.5,7.45) {负优势动作 $\widehat{A}_t<0$};
+
+\draw[rowbox, fill=white] (7.3,4.6) rectangle (12.2,6.35);
+\node[anchor=west, align=left] at (7.55,6.0) {
+新策略概率：$0.32$\\
+概率比值：$r_t(\theta)=0.32/0.40=0.80$\\
+位于下界\\
+允许降低动作概率
+};
+
+\draw[rowbox, fill=red!10] (12.8,4.6) rectangle (17.7,6.35);
+\node[anchor=west, align=left] at (13.05,6.0) {
+新策略概率：$0.20$\\
+概率比值：$r_t(\theta)=0.20/0.40=0.50$\\
+低于下界 $0.80$\\
+裁剪后按 $0.80$ 计算收益
+};
+
+\node[text=red!60!black] at (9.75,4.1) {\footnotesize 适度降低概率};
+\node[text=red!60!black] at (15.25,4.1) {\footnotesize 过大变化不再获得额外鼓励};
+
+% =========================
+% Bottom note
+% =========================
+\draw[panel, fill=gray!6] (6.9,2.2) rectangle (18.1,3.3);
+\node[align=center] at (12.5,2.75) {
+PPO 并不直接禁止新策略继续变化\\
+而是限制超出裁剪范围后的额外优化收益
+};
+
+\end{tikzpicture}

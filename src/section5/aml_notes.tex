@@ -1,0 +1,412 @@
+% !TeX program = xelatex
+% 中文课程讲义 LaTeX 模板
+% 编译建议：XeLaTeX 或 LuaLaTeX。Windows / macOS / Linux 均可使用 ctex 自动处理中文字体。
+\documentclass[UTF8,a4paper,zihao=-4,oneside,openany]{ctexbook}
+
+% 页面与基础排版
+\usepackage[
+  top=2.6cm,
+  bottom=2.6cm,
+  left=2.7cm,
+  right=2.7cm,
+  headheight=15pt
+]{geometry}
+\usepackage{setspace}
+\setstretch{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.2em}
+
+% 数学、表格、图片
+\usepackage{amsmath,amssymb}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\setlength{\emergencystretch}{3em}
+\sloppy
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric}
+\graphicspath{{figures/}{images/}}
+
+% 颜色与强调框
+\usepackage[most]{tcolorbox}
+\usepackage{xcolor}
+\definecolor{CourseInk}{HTML}{1F2933}
+\definecolor{CourseBlue}{HTML}{24577A}
+\definecolor{CourseGreen}{HTML}{2D6A4F}
+\definecolor{CourseGold}{HTML}{A16207}
+\definecolor{CourseGray}{HTML}{F4F6F8}
+\definecolor{CourseLine}{HTML}{D9E2EC}
+
+\tcbset{
+  enhanced,
+  boxrule=0.6pt,
+  arc=2mm,
+  left=3mm,
+  right=3mm,
+  top=2mm,
+  bottom=2mm,
+  breakable
+}
+
+\newtcolorbox{learninggoals}{
+  colback=CourseGray,
+  colframe=CourseBlue,
+  title=学习目标,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{importantnote}{
+  colback=white,
+  colframe=CourseGreen,
+  title=重点提示,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{examplebox}[1][]{
+  colback=white,
+  colframe=CourseGold,
+  title=例题 #1,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{exercisebox}{
+  colback=CourseGray,
+  colframe=CourseLine,
+  title=课堂练习,
+  fonttitle=\bfseries\color{CourseInk}
+}
+
+% 页眉页脚与链接
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small 中文课程讲义}
+\fancyhead[R]{\small \leftmark}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\usepackage[
+  colorlinks=true,
+  linkcolor=CourseBlue,
+  urlcolor=CourseGreen,
+  citecolor=CourseGold
+]{hyperref}
+
+% 章节样式
+\ctexset{
+  chapter = {
+    name = {第,讲},
+    number = \chinese{chapter},
+    format = \huge\bfseries\color{CourseBlue},
+    beforeskip = 0pt,
+    afterskip = 22pt
+  },
+  section = {
+    format = \Large\bfseries\color{CourseInk}
+  },
+  subsection = {
+    format = \large\bfseries\color{CourseInk}
+  }
+}
+
+% 常用命令
+\newcommand{\coursename}{中文课程名称}
+\newcommand{\semester}{2026 春季}
+\newcommand{\teacher}{授课教师}
+\newcommand{\school}{学校 / 机构名称}
+\newcommand{\lessondate}{\today}
+
+\newcommand{\blankline}{\par\noindent\rule{\linewidth}{0.4pt}\par}
+% 术语强调：对齐讲义第三章，使用黑色加粗（第三章用 \textbf，不使用彩色强调）。
+\newcommand{\keyword}[1]{\textbf{#1}}
+% 首次出现的术语（斜体），与第三章 \mindex 一致。
+\newcommand{\mindex}[1]{\textit{#1}}
+% 统一图片占位符：例子配图先用占位框，后续可替换为真实图片（便于做 PPT）。
+\newcommand{\imageplaceholder}[2][5cm]{%
+  \fbox{%
+    \begin{minipage}[c][#1][c]{0.78\linewidth}
+      \centering
+      \textbf{图片占位}\\[0.45em]
+      {\small #2}
+    \end{minipage}%
+  }%
+}
+
+% 直观理解框：用类比/比喻帮助学生建立直觉
+\definecolor{CoursePurple}{HTML}{6D28D9}
+\newtcolorbox{intuition}{
+  colback=CourseGray,
+  colframe=CoursePurple,
+  title=直观理解,
+  fonttitle=\bfseries
+}
+
+% 协作占位：标记"待陈丹补充（语音/音频部分）"的内容，便于后续合并时定位
+\newcommand{\todochen}[1]{%
+  \par\noindent
+  {\color{CourseGold}\small$\blacktriangleright$\ \textbf{[待陈丹补充 ·\ 语音/音频]}\ #1}\par}
+
+\begin{document}
+
+% 封面
+\begin{titlepage}
+  \centering
+  \vspace*{1.5cm}
+  {\zihao{1}\bfseries\color{CourseBlue}\coursename\par}
+  \vspace{0.8cm}
+  {\zihao{3}\bfseries 课程讲义模板\par}
+  \vspace{1.2cm}
+
+  \IfFileExists{figures/cover.jpg}{
+    \includegraphics[width=0.78\linewidth,height=0.32\textheight,keepaspectratio]{figures/cover.jpg}
+  }{
+    \fbox{
+      \begin{minipage}[c][0.24\textheight][c]{0.78\linewidth}
+        \centering
+        将封面图命名为 \texttt{cover.jpg} 并放入 \texttt{figures/} 目录后，会自动显示在这里。
+      \end{minipage}
+    }
+  }
+
+  \vfill
+  \begin{tabular}{rl}
+    \textbf{教师：} & \teacher \\
+    \textbf{学期：} & \semester \\
+    \textbf{单位：} & \school \\
+    \textbf{日期：} & \lessondate \\
+  \end{tabular}
+  \vspace*{1.2cm}
+\end{titlepage}
+
+% 目录
+\frontmatter
+\pagestyle{plain}
+\tableofcontents
+\cleardoublepage
+
+% 正文
+\mainmatter
+\pagestyle{fancy}
+
+\chapter{课程导论}
+
+\begin{learninggoals}
+  \begin{itemize}
+    \item 了解本课程的学习目标、评价方式与课堂要求。
+    \item 熟悉讲义中的例题、练习、阅读材料与作业模块。
+    \item 掌握如何在模板中插入章节、表格、图片和重点提示。
+  \end{itemize}
+\end{learninggoals}
+
+\section{课程说明}
+
+这里填写本讲的正文内容。中文可直接输入，不需要额外转码。若要突出关键词，可使用
+\keyword{关键词强调}，也可以使用普通的 \textbf{加粗}、\emph{斜体} 等格式。
+
+\begin{importantnote}
+  这里可以写课堂重点、易错点、考试提示，或者需要学生特别记住的概念。
+\end{importantnote}
+
+\section{表格示例}
+
+表格建议使用 \texttt{booktabs} 提供的 \verb|\toprule|、\verb|\midrule|、\verb|\bottomrule|，
+视觉会比普通竖线表格更清爽。
+
+\begin{table}[htbp]
+  \centering
+  \caption{课程安排示例}
+  \label{tab:schedule}
+  \begin{tabularx}{0.92\linewidth}{>{\centering\arraybackslash}p{2.3cm}X>{\centering\arraybackslash}p{2.8cm}}
+    \toprule
+    周次 & 主题 & 任务 \\
+    \midrule
+    第 1 周 & 课程导论与学习方法 & 阅读讲义 \\
+    第 2 周 & 核心概念一 & 完成练习 \\
+    第 3 周 & 核心概念二 & 小组讨论 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{图片示例}
+
+将图片放入 \texttt{figures/} 目录，然后用 \verb|\includegraphics| 插入。下面的示例会在
+\texttt{figures/example.png} 存在时显示图片，否则显示一个占位框。
+
+\begin{figure}[htbp]
+  \centering
+  \IfFileExists{figures/example.png}{
+    \includegraphics[width=0.78\linewidth]{figures/example.png}
+  }{
+    \fbox{
+      \begin{minipage}[c][5cm][c]{0.78\linewidth}
+        \centering
+        图片占位：将图片保存为 \texttt{figures/example.png}
+      \end{minipage}
+    }
+  }
+  \caption{图片插入示例}
+  \label{fig:example}
+\end{figure}
+
+\section{例题与练习}
+
+\begin{examplebox}[1]
+  这里放置例题内容。可以包含公式：
+  \[
+    a^2 + b^2 = c^2
+  \]
+  也可以写解题步骤或分析。
+\end{examplebox}
+
+\begin{exercisebox}
+  \begin{enumerate}
+    \item 请用自己的话概括本讲的三个重点。
+    \item 根据表~\ref{tab:schedule}，说明第 2 周需要完成什么任务。
+    \item 观察图~\ref{fig:example}，写出你能得到的信息。
+  \end{enumerate}
+\end{exercisebox}
+
+\chapter{第二讲标题}
+
+\section{知识点一}
+
+从这里开始写第二讲内容。新增章节时，复制下面结构即可：
+
+\begin{verbatim}
+\chapter{新的一讲}
+\section{小节标题}
+正文内容……
+\end{verbatim}
+
+\subsection{更小的层级}
+
+如果一讲内部内容较多，可以继续使用 \verb|\subsection| 或 \verb|\subsubsection| 组织层次。
+
+\section{长表格示例}
+
+如果表格跨页，可以使用 \texttt{longtable}。
+
+\begin{longtable}{p{0.18\linewidth}p{0.34\linewidth}p{0.34\linewidth}}
+  \caption{长表格结构示例}
+  \label{tab:longtable}\\
+  \toprule
+  模块 & 内容 & 备注 \\
+  \midrule
+  \endfirsthead
+  \toprule
+  模块 & 内容 & 备注 \\
+  \midrule
+  \endhead
+  课前 & 预习阅读材料 & 可附链接或二维码图片 \\
+  课中 & 讲授、讨论、练习 & 建议加入例题与即时反馈 \\
+  课后 & 作业、复盘、扩展阅读 & 可列出提交要求 \\
+  \bottomrule
+\end{longtable}
+
+% ============================================================
+% 第五部分 多模态机器学习与生成式人工智能（润松负责：框架 + 图像内容）
+% 内容本身定位为课程"第五部分"，因此把章节计数器对齐到"第五讲"。
+% 语音/音频小节由陈丹补充（见文中 \todochen 占位标记）。
+% ============================================================
+\setcounter{chapter}{4}
+\include{chapters/ch5_multimodal}
+
+\appendix
+\chapter{附录}
+
+\section{常用 LaTeX 片段}
+
+\begin{verbatim}
+% 插入普通图片
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/your-image.png}
+  \caption{图片标题}
+\end{figure}
+
+% 插入三线表
+\begin{table}[htbp]
+  \centering
+  \caption{表格标题}
+  \begin{tabular}{lll}
+    \toprule
+    A & B & C \\
+    \midrule
+    内容 & 内容 & 内容 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+\end{verbatim}
+
+\backmatter
+\chapter{参考资料}
+
+这里可以列出教材、论文、网站或其他阅读材料。
+
+\begin{thebibliography}{99}
+  % —— 第五部分 多模态机器学习方法与模型 ——
+  \bibitem{alexnet} Krizhevsky A, Sutskever I, Hinton G E. ImageNet Classification with Deep Convolutional Neural Networks. NeurIPS, 2012.
+  \bibitem{vgg} Simonyan K, Zisserman A. Very Deep Convolutional Networks for Large-Scale Image Recognition (VGG). ICLR, 2015.
+  \bibitem{resnet} He K, Zhang X, Ren S, Sun J. Deep Residual Learning for Image Recognition. CVPR, 2016.
+  \bibitem{vit} Dosovitskiy A, et al. An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale. ICLR, 2021.
+  \bibitem{simclr} Chen T, et al. A Simple Framework for Contrastive Learning of Visual Representations (SimCLR). ICML, 2020.
+  \bibitem{moco} He K, et al. Momentum Contrast for Unsupervised Visual Representation Learning (MoCo). CVPR, 2020.
+  \bibitem{dino} Caron M, et al. Emerging Properties in Self-Supervised Vision Transformers (DINO). ICCV, 2021.
+  \bibitem{cpc} van den Oord A, Li Y, Vinyals O. Representation Learning with Contrastive Predictive Coding (CPC). arXiv:1807.03748, 2018.
+  \bibitem{wav2vec2} Baevski A, Zhou H, Mohamed A, Auli M. wav2vec 2.0: A Framework for Self-Supervised Learning of Speech Representations. NeurIPS, 2020.
+  \bibitem{hubert} Hsu W N, et al. HuBERT: Self-Supervised Speech Representation Learning by Masked Prediction of Hidden Units. IEEE/ACM Transactions on Audio, Speech, and Language Processing, 2021.
+  \bibitem{data2vec} Baevski A, et al. data2vec: A General Framework for Self-Supervised Learning in Speech, Vision and Language. ICML, 2022.
+  \bibitem{mae} He K, et al. Masked Autoencoders Are Scalable Vision Learners (MAE). CVPR, 2022.
+  \bibitem{beit} Bao H, Dong L, Piao S, Wei F. BEiT: BERT Pre-Training of Image Transformers. ICLR, 2022.
+  \bibitem{clip} Radford A, et al. Learning Transferable Visual Models From Natural Language Supervision (CLIP). ICML, 2021.
+  \bibitem{align} Jia C, et al. Scaling Up Visual and Vision-Language Representation Learning With Noisy Text Supervision (ALIGN). ICML, 2021.
+  \bibitem{siglip} Zhai X, et al. Sigmoid Loss for Language Image Pre-Training (SigLIP). ICCV, 2023.
+  \bibitem{waco} Ouyang S, Ye R, Li L. WACO: Word-Aligned Contrastive Learning for Speech Translation. ACL, 2023.
+  \bibitem{clap} Elizalde B, Deshmukh S, Al Ismail M, Wang H. CLAP: Learning Audio Concepts From Natural Language Supervision. ICASSP, 2023.
+  \bibitem{flamingo} Alayrac J B, et al. Flamingo: a Visual Language Model for Few-Shot Learning. NeurIPS, 2022.
+  \bibitem{blip2} Li J, et al. BLIP-2: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models. ICML, 2023.
+  \bibitem{llava} Liu H, et al. Visual Instruction Tuning (LLaVA). NeurIPS, 2023.
+  \bibitem{instructblip} Dai W, et al. InstructBLIP: Towards General-purpose Vision-Language Models with Instruction Tuning. NeurIPS, 2023.
+  \bibitem{qwenvl} Bai J, et al. Qwen-VL: A Versatile Vision-Language Model for Understanding, Localization, Text Reading, and Beyond. arXiv:2308.12966, 2023.
+  \bibitem{whisper} Radford A, et al. Robust Speech Recognition via Large-Scale Weak Supervision (Whisper). ICML, 2023.
+  \bibitem{speechgpt} Zhang D, et al. SpeechGPT: Empowering Large Language Models with Intrinsic Cross-Modal Conversational Abilities. Findings of EMNLP, 2023.
+  \bibitem{qwenaudio} Chu Y, et al. Qwen-Audio: Advancing Universal Audio Understanding via Unified Large-Scale Audio-Language Models. arXiv:2311.07919, 2023.
+  \bibitem{salmonn} Tang C, et al. SALMONN: Towards Generic Hearing Abilities for Large Language Models. ICLR, 2024.
+  \bibitem{emu} Sun Q, et al. Emu: Generative Pretraining in Multimodality. ICLR, 2024.
+  \bibitem{gan} Goodfellow I, et al. Generative Adversarial Nets. NeurIPS, 2014.
+  \bibitem{vae} Kingma D P, Welling M. Auto-Encoding Variational Bayes (VAE). ICLR, 2014.
+  \bibitem{ddpm} Ho J, Jain A, Abbeel P. Denoising Diffusion Probabilistic Models (DDPM). NeurIPS, 2020.
+  \bibitem{cfg} Ho J, Salimans T. Classifier-Free Diffusion Guidance. arXiv:2207.12598, 2022.
+  \bibitem{dalle} Ramesh A, et al. Zero-Shot Text-to-Image Generation (DALL·E). ICML, 2021.
+  \bibitem{glide} Nichol A, et al. GLIDE: Towards Photorealistic Image Generation and Editing with Text-Guided Diffusion Models. ICML, 2022.
+  \bibitem{dalle2} Ramesh A, et al. Hierarchical Text-Conditional Image Generation with CLIP Latents (DALL·E 2). arXiv:2204.06125, 2022.
+  \bibitem{imagen} Saharia C, et al. Photorealistic Text-to-Image Diffusion Models with Deep Language Understanding (Imagen). NeurIPS, 2022.
+  \bibitem{ldm} Rombach R, et al. High-Resolution Image Synthesis with Latent Diffusion Models (Stable Diffusion). CVPR, 2022.
+  \bibitem{sdedit} Meng C, et al. SDEdit: Guided Image Synthesis and Editing with Stochastic Differential Equations. ICLR, 2022.
+  \bibitem{p2p} Hertz A, et al. Prompt-to-Prompt Image Editing with Cross Attention Control. ICLR, 2023.
+  \bibitem{ip2p} Brooks T, Holynski A, Efros A A. InstructPix2Pix: Learning to Follow Image Editing Instructions. CVPR, 2023.
+  \bibitem{controlnet} Zhang L, Rao A, Agrawala M. Adding Conditional Control to Text-to-Image Diffusion Models (ControlNet). ICCV, 2023.
+  \bibitem{tacotron2} Shen J, et al. Natural TTS Synthesis by Conditioning WaveNet on Mel Spectrogram Predictions (Tacotron 2). ICASSP, 2018.
+  \bibitem{fastspeech2} Ren Y, et al. FastSpeech 2: Fast and High-Quality End-to-End Text to Speech. ICLR, 2021.
+  \bibitem{vits} Kim J, Kong J, Son J. Conditional Variational Autoencoder with Adversarial Learning for End-to-End Text-to-Speech (VITS). ICML, 2021.
+  \bibitem{valle} Wang C, et al. Neural Codec Language Models are Zero-Shot Text to Speech Synthesizers (VALL-E). arXiv:2301.02111, 2023.
+  \bibitem{nist-synthetic} National Institute of Standards and Technology. Reducing Risks Posed by Synthetic Content. NIST AI 100-4, 2024.
+  \bibitem{dreambooth} Ruiz N, et al. DreamBooth: Fine Tuning Text-to-Image Diffusion Models for Subject-Driven Generation. CVPR, 2023.
+  \bibitem{audiogen} Kreuk F, et al. AudioGen: Textually Guided Audio Generation. ICLR, 2023.
+  \bibitem{audioldm} Liu H, et al. AudioLDM: Text-to-Audio Generation with Latent Diffusion Models. ICML, 2023.
+  \bibitem{makeanaudio} Huang R, et al. Make-An-Audio: Text-To-Audio Generation with Prompt-Enhanced Diffusion Models. ICML, 2023.
+  \bibitem{makeanaudio2} Huang J, et al. Make-An-Audio 2: Temporal-Enhanced Text-to-Audio Generation. arXiv:2305.18474, 2023.
+  \bibitem{audit} Wang Y, et al. AUDIT: Audio Editing by Following Instructions with Latent Diffusion Models. NeurIPS, 2023.
+  \bibitem{codi} Tang Z, et al. Any-to-Any Generation via Composable Diffusion (CoDi). NeurIPS, 2023.
+  
+\end{thebibliography}
+
+\end{document}

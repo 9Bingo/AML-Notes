@@ -1,0 +1,59 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\ssep{1.3cm}
+\def\bsep{2.5cm}
+
+\tikzstyle{lnode} = [fig/module,minimum width=3.0cm,minimum height=0.6cm,inner sep=2pt]
+
+\begin{scope}
+\draw [-{Latex[scale=1.2]},thick] (0,0) -- (13.5,0);
+\draw [-{Latex[scale=1.2]},thick] (0,-1.5) -- (0,2.5);
+\node [anchor=north east,align=right] (ylabel) at (0-0.1,2.5) {\footnotesize{位置 $x(t)$}};
+\node [anchor=north,align=left] (xlabel) at (13.3,-0.1) {\footnotesize{时间 $t$}};
+
+\draw [Round Cap-Round Cap,blue,very thick,domain=0:12.7,samples=100] plot (\x,{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))});
+
+\foreach \x in {2.5}{
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\node [circle,minimum size=6pt,inner sep=0,fill=blue] (point) at (\x,\p) {};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (px) at (\x,0) {};
+\node [anchor=north] (plabel) at (\x,-0.1) {\footnotesize{$t_1$}};
+\draw [-,dashed] (point) -- (px);
+}
+
+\draw [-,dotted,thick] (2.4,1.38) -- (2.6,0.37);
+\draw [->,blue] (2.5,0.88) -- (4,1.17);
+
+\node [anchor=south,xshift=1.3cm] (derivativelabel) at (4,1.3) {\footnotesize{$t_1$ 时 $x(t)$ 的导数 = $t_1$ 时的速度}};
+
+\node [fig/caption,anchor=north] (caption) at (6.5,-2.0) {\small{(a) 位置 $x(t)$ 随时间 $t$ 的变化}};
+
+\end{scope}
+
+\begin{scope}[yshift=-6.0cm]
+\draw [-{Latex[scale=1.2]},thick] (0,0) -- (13.5,0);
+\draw [-{Latex[scale=1.2]},thick] (0,-1.5) -- (0,2.5);
+\node [anchor=north east,align=right] (ylabel) at (0-0.1,2.5) {\footnotesize{速度}\\[-2pt] \footnotesize{$f(x(t),t)$}\\[-2pt] \footnotesize{（即 $\frac{d x(t)}{d t}$）}};
+\node [anchor=north,align=left] (xlabel) at (13.3,-0.1) {\footnotesize{时间 $t$}};
+
+\draw [Round Cap-Round Cap,blue,very thick,domain=0:12.7,samples=100] plot (\x,{ - 1/200 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5)});
+
+\foreach \x in {2.5}{
+\pgfmathsetmacro{\p}{ - 1/200 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5)}
+\node [circle,minimum size=6pt,inner sep=0,fill=blue] (point) at (\x,\p) {};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (px) at (\x,0) {};
+\node [anchor=north] (plabel) at (\x,-0.1) {\footnotesize{$t_1$}};
+\draw [-,dashed] (point) -- (px);
+}
+
+\node [anchor=south west] (velocity) at (2.5,0.5) {\footnotesize{$t_1$ 时的速度}};
+
+\node [fig/caption,anchor=north] (caption) at (6.5,-2.0) {\small{(b) 速度 $f(x(t),t)$（即 $\frac{d x(t)}{d t}$）随时间 $t$ 的变化}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

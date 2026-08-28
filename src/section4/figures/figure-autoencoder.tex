@@ -1,0 +1,61 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\ssize{1}
+\def\boxsize{1.3}
+\def\smallsize{0.13}
+
+\tikzstyle{snode} = [fig/module,minimum width=0.28cm,minimum height=0.28cm,inner sep=0pt]
+
+\begin{scope}[scale=0.75]
+
+\draw [-,thick,draw=red,fill=red!24] (0,0) -- (0,6) -- (6,5) -- (6,1) -- cycle;
+
+\draw [-,thick,fill=FigPaper] (6.5,1) rectangle (7.5,5);
+
+\draw [-,thick,draw=blue,fill=blue!24] (8,5) -- (14,6) -- (14,0) -- (8,1) -- cycle;
+
+\node [anchor=center,rotate=90] (aeinput) at (-0.5,3) {\small{输入}};
+\node [anchor=center,rotate=90] (hidden) at (7,3) {\small{隐变量}};
+\node [anchor=center,rotate=90] (aeoutput) at (14.5,3) {\small{重构输入}};
+\node [anchor=center] (encoderlabel) at (3,3) {\Large{编码器}};
+\node [anchor=center] (decoderlabel) at (11,3) {\Large{解码器}};
+
+\node [anchor=west,font=\bfseries\sffamily] (autoencoderlabel) at (-2,7) {\small{自动编码器}};
+\node [anchor=north west,font=\bfseries\sffamily] (dmlabel) at (-2.0,-1.2) {\small{扩散模型}};
+
+\def\xbase{-0.2}
+\def\ybase{-2.5}
+\draw [-] (\xbase,\ybase) rectangle (\xbase-\boxsize,\ybase-\boxsize) node [midway] (image) {\color{green!50!black} \huge{$\mathcal{X}$}};
+\node [anchor=north,align=center] (imagelabel) at ([yshift=-0.2cm]image.south) {\footnotesize{自然图像 $\mathbf{x}$（即 $\mathbf{x}(0)$）}\\[-3pt] \footnotesize{$\mathbf{x} \sim p_0$}};
+
+\def\xbase{7+\boxsize/2}
+\def\ybase{-2.5}
+\draw [-] (\xbase,\ybase) rectangle (\xbase-\boxsize,\ybase-\boxsize) node [midway] (noise) {\color{green!50!black} \huge{$\mathcal{X}$}};
+\node [anchor=north,align=center] (noiselabel) at ([yshift=-0.22cm]noise.south) {\footnotesize{噪声 $\mathbf{z}$（即 $\mathbf{x}(T)$）}\\[-3pt] \footnotesize{$\mathbf{z} \sim p_T$}};
+
+\pgfmathsetseed{42}
+\foreach \x  in {0,1,...,9}{
+    \foreach \y  in {0,1,...,9}{
+        \pgfmathtruncatemacro{\myint}{100*rnd}
+        \draw [fill=black!\myint,draw=white] ({\xbase-\x*\smallsize-\smallsize},{\ybase-\y*\smallsize-\smallsize}) rectangle ({\xbase-\x*\smallsize},{\ybase-\y*\smallsize});
+    }
+}
+
+\def\xbase{14+0.2+\boxsize}
+\def\ybase{-2.5}
+\draw [-] (\xbase,\ybase) rectangle ({\xbase-\boxsize},{\ybase-\boxsize}) node [midway] (image2) {\color{green!50!black} \huge{$\mathcal{X}$}};
+\node [anchor=north,align=center] (image2label) at ([yshift=-0.2cm]image2.south) {\footnotesize{自然图像 $\mathbf{x}$（即 $\mathbf{x}(0)$）}\\[-3pt] \footnotesize{$\mathbf{x} \sim p_0$}};
+
+\draw [fig/flow secondary] ([xshift=4pt]image.east) -- ([xshift=-4pt]noise.west) node [pos=0.5,below,yshift=-0.1cm] (forwardpass) {\footnotesize{前向过程}};
+\draw [fig/flow primary] ([xshift=4pt]noise.east) -- ([xshift=-4pt]image2.west) node [pos=0.5,below,yshift=-0.1cm] (backwardpass) {\footnotesize{反向过程}};
+
+\node [anchor=south] (forwardpush) at ([yshift=0.2cm]forwardpass.north) {\footnotesize{$p_T = (\Phi_{0 \to T})_{\#} p_0$}};
+\node [anchor=south] (backwardpush) at ([yshift=0.2cm]backwardpass.north) {\footnotesize{$p_0 = (\Phi_{T \to 0})_{\#} p_T$}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

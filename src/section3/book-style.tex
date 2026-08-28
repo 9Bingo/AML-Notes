@@ -1,0 +1,569 @@
+
+% \usepackage[french]{babel}
+\usepackage{titlesec}
+\usepackage{graphicx}
+\graphicspath{{Figures/}}
+
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{enumitem}
+\setlist{nolistsep}
+\usepackage{amsmath,bm}
+\usepackage{pifont}
+\usepackage{bbm}
+\usepackage{enumitem}
+\usepackage[normalem]{ulem}
+\usepackage{framed}
+\usepackage{tcolorbox}
+\usepackage{ulem}
+
+\usepackage{tikz}
+\usepackage{tikz-qtree}
+\usepackage{tikz-3dplot}
+
+\usepgflibrary{patterns}
+\usetikzlibrary{patterns}
+\usetikzlibrary{patterns.meta}
+
+\usepackage{array}
+\newcommand{\PreserveBackslash}[1]{\let\temp=\\#1\let\\=\temp}
+\newcolumntype{C}[1]{>{\PreserveBackslash\centering}p{#1}}
+\newcolumntype{R}[1]{>{\PreserveBackslash\raggedleft}p{#1}}
+\newcolumntype{L}[1]{>{\PreserveBackslash\raggedright}p{#1}}
+
+\usetikzlibrary {arrows.meta,bending,positioning}
+\usetikzlibrary{angles,quotes}
+\usetikzlibrary{fit}
+\usetikzlibrary{backgrounds}
+\usepackage{pgfplots}
+\usepackage{soul}
+\usepackage{xcolor}
+\definecolor{ocrebase}{RGB}{243,102,25}
+\definecolor{ocre}{RGB}{0,0,0}
+\definecolor{amber}{rgb}{1.0, 0.75, 0.0}
+\definecolor{ublue}{rgb}{0.152,0.250,0.545}
+\definecolor{ugreen}{rgb}{0,0.5,0}
+\definecolor{lgreen}{rgb}{0.9,1,0.8}
+\definecolor{lightgreen}{rgb}{0.56, 0.93, 0.56}
+\definecolor{kellygreen}{rgb}{0.3, 0.73, 0.09}
+\definecolor{xtgreen}{rgb}{0.914,0.945,0.902}
+\definecolor{lightgray}{gray}{0.85}
+\definecolor{darkblue}{rgb}{0, 0, 0.5}
+\definecolor{shadecolor}{rgb}{0.96,0.96,0.93}
+
+\definecolor{lightcyan}{RGB}{194,232,247}
+\definecolor{lightorange}{RGB}{255,226,187}
+\definecolor{lightpink}{RGB}{252,224,225}
+\definecolor{lightgreen}{RGB}{204,231,207}
+
+\definecolor{lolgreen}{RGB}{103,213,181}
+\definecolor{lolred}{RGB}{238,119,133}
+\definecolor{lolpurple}{RGB}{200,158,196}
+\definecolor{lolblue}{RGB}{132,177,237}
+\definecolor{lolorange}{RGB}{246,179,82}
+\definecolor{lightsalmon}{RGB}{255,160,122}
+\definecolor{lightskyblue}{RGB}{135,206,250}
+
+\usetikzlibrary{shadows}
+\usepackage{multirow}
+\usepackage{appendix}
+
+\usepackage{longtable}
+\usepackage{makecell}
+\usepackage{array}
+
+\newcommand{\ctext}[3][RGB]{
+  \begingroup
+  \definecolor{hlcolor}{#1}{#2}\sethlcolor{hlcolor}
+  \hl{#3}
+  \endgroup
+}
+
+
+\usepackage{geometry}
+
+\geometry{
+	papersize={185mm,260mm},
+	top=2.2cm,
+	bottom=1.7cm,
+	left=2.2cm,
+	right=2.0cm,
+	headheight=10pt,
+	footskip=1.4cm,
+	headsep=10pt,
+}
+
+
+\usepackage{times}
+\usepackage{mathptmx}
+
+\usepackage{microtype}
+% \usepackage[utf8]{inputenc}
+% \usepackage[T1]{fontenc}
+
+
+\makeatletter
+\renewcommand*\env@matrix[1][\arraystretch]{
+  \edef\arraystretch{#1}
+  \hskip -\arraycolsep
+  \let\@ifnextchar\new@ifnextchar
+  \array{*\c@MaxMatrixCols c}}
+\makeatother
+
+
+
+
+\usepackage{natbib}
+\setlength{\bibsep}{5pt}
+\renewcommand{\bibfont}{\fontsize{10pt}{12pt}\selectfont}
+
+\setcitestyle{square,aysep={,},yysep={;}}
+\renewcommand\cite{\citep}
+\newcommand\shortcite{\citeyearpar}
+\newcommand\newcite{\citet}
+
+\usepackage{calc}
+\usepackage{makeidx}
+\makeindex
+\newcommand{\upcite}[1]{\textsuperscript{\textsuperscript{\cite{#1}}}}
+
+\newcommand{\mindex}[1]{\textbf{#1}\index{#1}}
+
+
+\usepackage{titletoc}
+
+\contentsmargin{0cm}
+
+\titlecontents{part}
+	[0cm]
+	{\addvspace{20pt}\bfseries}
+	{}
+	{}
+	{}
+
+\titlecontents{chapter}
+	[1.25cm]
+	{\addvspace{12pt}\large\sffamily\bfseries}
+	{\color{black}\contentslabel[\Large\thecontentslabel]{1.25cm}\color{black}}
+	{\color{black}}
+	{\color{black}\normalsize\;\titlerule*[.5pc]{.}\;\thecontentspage}
+
+\titlecontents{section}
+	[1.25cm]
+	{\addvspace{3pt}\sffamily\bfseries}
+	{\contentslabel[\thecontentslabel]{1.25cm}}
+	{}
+	{\titlerule*[.5pc]{.}\;\thecontentspage}
+\titlecontents{subsection}
+	[1.25cm]
+	{\addvspace{1pt}\sffamily\small}
+	{\contentslabel[\thecontentslabel]{1.25cm}}
+	{}
+	{\ \titlerule*[.5pc]{.}\;\thecontentspage}
+
+\titlecontents{figure}
+	[1.25cm]
+	{\addvspace{1pt}\sffamily\small}
+	{\thecontentslabel\hspace*{1em}}
+	{}
+	{\ \titlerule*[.5pc]{.}\;\thecontentspage}
+
+\titlecontents{table}
+	[1.25cm]
+	{\addvspace{1pt}\sffamily\small}
+	{\thecontentslabel\hspace*{1em}}
+	{}
+	{\ \titlerule*[.5pc]{.}\;\thecontentspage}
+
+
+\titlecontents{lchapter}
+	[0em]
+	{\addvspace{15pt}\large\sffamily\bfseries}
+	{\color{black}\contentslabel[\Large\thecontentslabel]{1.25cm}\color{black}}
+	{}
+	{\color{black}\normalsize\sffamily\bfseries\;\titlerule*[.5pc]{.}\;\thecontentspage}
+
+\titlecontents{lsection}
+	[0em]
+	{\sffamily\small}
+	{\contentslabel[\thecontentslabel]{1.25cm}}
+	{}
+	{}
+
+\titlecontents{lsubsection}
+	[.5em]
+	{\sffamily\footnotesize}
+	{\contentslabel[\thecontentslabel]{1.25cm}}
+	{}
+	{}
+
+
+\usepackage{fancyhdr}
+
+\pagestyle{fancy}
+
+\renewcommand{\chaptermark}[1]{\markboth{\sffamily\normalsize\chaptername\ \thechapter.\ #1}{}}
+\renewcommand{\sectionmark}[1]{\markright{\sffamily\normalsize\thesection\hspace{5pt}#1}{}}
+
+\fancyhf{}
+\fancyhead[LE,RO]{\sffamily\normalsize\thepage}
+\fancyhead[LO]{\rightmark}
+\fancyhead[RE]{\leftmark}
+
+\renewcommand{\headrulewidth}{0.5pt}
+
+\fancypagestyle{plain}{
+	\fancyhead{}\renewcommand{\headrulewidth}{0pt}
+}
+
+\makeatletter
+\renewcommand{\cleardoublepage}{
+\clearpage\ifodd\c@page\else
+\hbox{}
+\vspace*{\fill}
+\thispagestyle{empty}
+\newpage
+\fi}
+
+
+
+\newcommand{\newlinebold}{\vskip6pt\goodbreak\hrule height 1pt\vskip6pt}
+\newcommand{\newlinelight}{\vskip6pt\goodbreak\hrule\vskip6pt}
+
+\let\bblxv\verbatim
+\let\bblexv\endverbatim
+\def\verbatim{\begin{shaded*}\bblxv\vskip-\baselineskip\vskip2.5\parsep}
+\def\endverbatim{\bblexv\vskip-2\baselineskip\end{shaded*}}
+
+
+\usepackage{amsmath,amsfonts,amssymb,amsthm}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\DeclareSymbolFont{EulerExtension}{U}{euex}{m}{n}
+\DeclareMathSymbol{\euintop}{\mathop} {EulerExtension}{"52}
+\let\intop\euintop
+
+\newcommand{\intoo}[2]{\mathopen{]}#1\,;#2\mathclose{[}}
+\newcommand{\ud}{\mathop{\mathrm{{}d}}\mathopen{}}
+\newcommand{\intff}[2]{\mathopen{[}#1\,;#2\mathclose{]}}
+\renewcommand{\qedsymbol}{$\blacksquare$}
+\newtheorem{notation}{Notation}[chapter]
+
+\newtheoremstyle{ocrenumbox}
+{0pt}
+{0pt}
+{\normalfont}
+{}
+{\small\bf\sffamily\color{ocre}}
+{\;}
+{0.25em}
+{\small\sffamily\color{ocre}\thmname{#1}\nobreakspace\thmnumber{\@ifnotempty{#1}{}\@upn{#2}}
+\thmnote{\nobreakspace\the\thm@notefont\sffamily\bfseries\color{black}---\nobreakspace#3.}}
+
+\newtheoremstyle{blacknumex}
+{5pt}
+{5pt}
+{\normalfont}
+{}
+{\small\bf\sffamily}
+{\;}
+{0.25em}
+{\small\sffamily{\tiny\ensuremath{}}\nobreakspace\thmname{#1}\nobreakspace\thmnumber{\@ifnotempty{#1}{}\@upn{#2}}
+\thmnote{\nobreakspace\the\thm@notefont\sffamily\bfseries---\nobreakspace#3.}}
+
+\newtheoremstyle{blacknumbox}
+{0pt}
+{0pt}
+{\normalfont}
+{}
+{\small\bf\sffamily}
+{\;}
+{0.25em}
+{\small\sffamily\thmname{#1}\nobreakspace\thmnumber{\@ifnotempty{#1}{}\@upn{#2}}
+\thmnote{\nobreakspace\the\thm@notefont\sffamily\bfseries---\nobreakspace#3.}}
+
+\newtheoremstyle{ocrenum}
+{5pt}
+{5pt}
+{\normalfont}
+{}
+{\small\bf\sffamily\color{ocre}}
+{\;}
+{0.25em}
+{\small\sffamily\color{ocre}\thmname{#1}\nobreakspace\thmnumber{\@ifnotempty{#1}{}\@upn{#2}}
+\thmnote{\nobreakspace\the\thm@notefont\sffamily\bfseries\color{black}---\nobreakspace#3.}}
+\makeatother
+
+\newcounter{dummy}
+\numberwithin{dummy}{section}
+\theoremstyle{ocrenumbox}
+\newtheorem{theoremeT}[dummy]{Theorem}
+\newtheorem{problem}{Problem}[chapter]
+\newtheorem{exerciseT}{Example}[chapter]
+\theoremstyle{blacknumex}
+\newtheorem{exampleT}{Example}[chapter]
+\theoremstyle{blacknumbox}
+\newtheorem{vocabulary}{Vocabulary}[chapter]
+\newtheorem{definitionT}{Definition}[section]
+\newtheorem{corollaryT}[dummy]{Corollary}
+\theoremstyle{ocrenum}
+\newtheorem{proposition}[dummy]{Proposition}
+
+
+\RequirePackage[framemethod=default]{mdframed}
+
+\newmdenv[skipabove=7pt,
+skipbelow=7pt,
+rightline=false,
+leftline=true,
+topline=false,
+bottomline=false,
+linecolor=ublue,
+innerleftmargin=5pt,
+innerrightmargin=10pt,
+innertopmargin=0pt,
+leftmargin=0cm,
+rightmargin=0cm,
+linewidth=4pt,
+backgroundcolor=black!5,
+innerbottommargin=0pt]{AlgorithmBox}
+
+\newmdenv[skipabove=7pt,
+skipbelow=7pt,
+backgroundcolor=black!5,
+linecolor=ocre,
+innerleftmargin=5pt,
+innerrightmargin=5pt,
+innertopmargin=5pt,
+leftmargin=0cm,
+rightmargin=0cm,
+innerbottommargin=5pt]{tBox}
+
+\newmdenv[skipabove=7pt,
+skipbelow=7pt,
+rightline=false,
+leftline=true,
+topline=false,
+bottomline=false,
+backgroundcolor=ocre!10,
+linecolor=ocre,
+innerleftmargin=5pt,
+innerrightmargin=5pt,
+innertopmargin=5pt,
+innerbottommargin=5pt,
+leftmargin=0cm,
+rightmargin=0cm,
+linewidth=4pt]{eBox}
+
+\newmdenv[skipabove=7pt,
+skipbelow=7pt,
+rightline=false,
+leftline=true,
+topline=false,
+bottomline=false,
+linecolor=ublue,
+innerleftmargin=5pt,
+innerrightmargin=5pt,
+innertopmargin=0pt,
+leftmargin=0cm,
+rightmargin=0cm,
+linewidth=4pt,
+innerbottommargin=0pt]{dBox}
+
+\newmdenv[skipabove=7pt,
+skipbelow=7pt,
+rightline=false,
+leftline=true,
+topline=false,
+bottomline=false,
+linecolor=gray,
+backgroundcolor=black!5,
+innerleftmargin=5pt,
+innerrightmargin=5pt,
+innertopmargin=5pt,
+leftmargin=0cm,
+rightmargin=0cm,
+linewidth=4pt,
+innerbottommargin=5pt]{cBox}
+
+
+\newenvironment{theorem}{\begin{tBox}\begin{theoremeT}}{\end{theoremeT}\end{tBox}}
+\newenvironment{exercise}{\begin{eBox}\begin{exerciseT}}{\hfill{\color{ocre}\tiny\ensuremath{\blacksquare}}\end{exerciseT}\end{eBox}}
+\newenvironment{definition}{\begin{dBox}\begin{definitionT}}{\end{definitionT}\end{dBox}}
+\newenvironment{example}{\begin{exampleT}}{\end{exampleT}}
+\newenvironment{corollary}{\begin{cBox}\begin{corollaryT}}{\end{corollaryT}\end{cBox}}
+
+
+\newenvironment{remark}{\par\vspace{10pt}\small
+\begin{list}{}{
+\leftmargin=35pt
+\rightmargin=25pt}\item\ignorespaces
+\makebox[-2.5pt]{\begin{tikzpicture}[overlay]
+\node[draw=ocre!60,line width=1pt,circle,fill=ocre!25,font=\sffamily\bfseries,inner sep=2pt,outer sep=0pt] at (-15pt,0pt){\textcolor{ocre}{R}};\end{tikzpicture}}
+\advance\baselineskip 1pt}{\end{list}\vskip5pt}
+
+\makeatletter
+\renewcommand{\@seccntformat}[1]{\llap{\textcolor{ocre}{\csname the#1\endcsname}\hspace{1em}}}
+\renewcommand{\section}{\@startsection{section}{1}{\z@}
+{-4ex \@plus -1ex \@minus -.4ex}
+{1ex \@plus.2ex }
+{\Large\sffamily\bfseries}}
+\renewcommand{\subsection}{\@startsection {subsection}{2}{\z@}
+{-3ex \@plus -0.1ex \@minus -.4ex}
+{0.5ex \@plus.2ex }
+{\normalfont\large\sffamily\bfseries}}
+\renewcommand{\subsubsection}{\@startsection {subsubsection}{3}{\z@}
+{-3ex \@plus -0.1ex \@minus -.4ex}
+{.4ex \@plus.2ex }
+{\normalfont\normalsize\sffamily\bfseries}}
+\renewcommand\paragraph{\@startsection{paragraph}{4}{\z@}
+{-2ex \@plus-.2ex \@minus .2ex}
+{.1ex}
+{\normalfont\small\sffamily\bfseries}}
+
+
+\newcommand{\@mypartnumtocformat}[2]{
+	\setlength\fboxsep{0pt}
+    \noindent\colorbox{blue!80}{\strut\parbox[c][.7cm]{\ecart}{\color{white}\Large\sffamily\bfseries\centering#1}}\hskip\esp\colorbox{blue!80}{\strut\parbox[c][.7cm]{\linewidth-\ecart-\esp}{\color{white}\Large\sffamily\centering#2}}
+}
+
+\newcommand{\@myparttocformat}[1]{
+	\setlength\fboxsep{0pt}
+	\noindent\colorbox{blue!80}{\strut\parbox[c][.7cm]{\linewidth}{\color{white}\Large\sffamily\centering#1}}
+}
+
+\newlength\esp
+\setlength\esp{4pt}
+\newlength\ecart
+\setlength\ecart{1.2cm-\esp}
+\newcommand{\thepartimage}{}
+\newcommand{\partimage}[1]{\renewcommand{\thepartimage}{#1}}
+\def\@part[#1]#2{
+\ifnum \c@secnumdepth >-2\relax
+\refstepcounter{part}
+\addcontentsline{toc}{part}{\texorpdfstring{\protect\@mypartnumtocformat{\thepart}{#1}}{\partname~\thepart\ ---\ #1}}
+\else
+\addcontentsline{toc}{part}{\texorpdfstring{\protect\@myparttocformat{#1}}{#1}}
+\fi
+\startcontents
+\markboth{}{}
+{\thispagestyle{empty}
+\begin{tikzpicture}[remember picture,overlay]
+\node at (current page.north west){\begin{tikzpicture}[remember picture,overlay]
+\fill[white](0cm,0cm) rectangle (\paperwidth,-\paperheight);
+\node[anchor=north west] at (2cm,-3.25cm){\color{ublue}\fontsize{80}{60}\sffamily\bfseries\thepart};
+\node[anchor=south east] at (\paperwidth-1cm,-\paperheight+1cm){\parbox[t][][t]{9.5cm}{
+\printcontents{l}{0}{\setcounter{tocdepth}{1}}
+}};
+\node[anchor=north east] at (\paperwidth-1.5cm,-3.25cm){\parbox[t][][t]{15cm}{\strut\raggedleft\color{black}\fontsize{30}{30}\sffamily\bfseries#2}};
+\end{tikzpicture}};
+\end{tikzpicture}}
+\@endpart}
+\def\@spart#1{
+\startcontents
+\phantomsection
+{\thispagestyle{empty}
+\begin{tikzpicture}[remember picture,overlay]
+\node at (current page.north west){\begin{tikzpicture}[remember picture,overlay]
+\fill[ocre!20](0cm,0cm) rectangle (\paperwidth,-\paperheight);
+\node[anchor=north east] at (\paperwidth-1.5cm,-3.25cm){\parbox[t][][t]{15cm}{\strut\raggedleft\color{black}\fontsize{30}{30}\sffamily\bfseries#1}};
+\end{tikzpicture}};
+\end{tikzpicture}}
+\addcontentsline{toc}{part}{\texorpdfstring{
+\setlength\fboxsep{0pt}
+\noindent\protect\colorbox{ocre!40}{\strut\protect\parbox[c][.7cm]{\linewidth}{\Large\sffamily\protect\centering #1\quad\mbox{}}}}{#1}}
+\@endpart}
+\def\@endpart{\vfil\newpage
+\if@twoside
+\if@openright
+\null
+\thispagestyle{empty}
+\newpage
+\fi
+\fi
+\if@tempswa
+\twocolumn
+\fi}
+
+
+\titleformat{\chapter}[display]
+  {\normalfont\sffamily\Huge\bfseries\color{ublue}}
+  {\chaptertitlename\ \thechapter}{20pt}{\LARGE}
+\titleformat{\section}
+  {\normalfont\sffamily\Large\bfseries\color{ublue}}
+  {\thesection}{1em}{}
+
+\fancypagestyle{chapterurl}{
+\fancyhf{}
+\fancyhead[R]{
+\small{本书由大语言模型自动翻译生成，非人工翻译}\\[0.5cm]
+\small{\url{https://github.com/NiuTrans/NLPBook}}\\[2pt] \small{\url{https://github.com/NiuTrans/NLPBookTranslations}} \\[2pt]
+}
+
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+}
+
+
+
+\newcommand{\sectionnewpage}{}
+
+
+{\newcommand{\mycfont}{song}}
+{\newcommand{\mycfont}{gbsn}}
+
+\AtBeginDocument{
+\SetSymbolFont{operators}{normal}{OT1}{cmr} {m}{n}
+\SetSymbolFont{letters}{normal}{OML}{cmm} {m}{it}
+\SetSymbolFont{symbols}{normal}{OMS}{cmsy}{m}{n}
+\SetSymbolFont{largesymbols}{normal}{OMX}{cmex}{m}{n}
+\SetSymbolFont{operators}{bold}{OT1}{cmr} {bx}{n}
+\SetSymbolFont{letters}{bold}{OML}{cmm} {b}{it}
+\SetSymbolFont{symbols}{bold}{OMS}{cmsy}{b}{n}
+\SetSymbolFont{largesymbols}{bold}{OMX}{cmex}{m}{n}
+
+\SetMathAlphabet{\mathbf}{normal}{OT1}{cmr}{bx}{n}
+\SetMathAlphabet{\mathsf}{normal}{OT1}{cmss}{m}{n}
+\SetMathAlphabet{\mathit}{normal}{OT1}{cmr}{m}{it}
+\SetMathAlphabet{\mathtt}{normal}{OT1}{cmtt}{m}{n}
+\SetMathAlphabet{\mathbf}{bold}{OT1}{cmr}{bx}{n}
+\SetMathAlphabet{\mathsf}{bold}{OT1}{cmss}{bx}{n}
+\SetMathAlphabet{\mathit}{bold}{OT1}{cmr}{bx}{it}
+\SetMathAlphabet{\mathtt}{bold}{OT1}{cmtt}{m}{n}
+}
+
+
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,citecolor=blue,linkcolor=blue,urlcolor=blue}
+
+
+\usepackage{bookmark}
+\bookmarksetup{
+open,
+numbered,
+depth=2,
+addtohook={
+\ifnum\bookmarkget{level}=0
+\bookmarksetup{bold}
+\fi
+\ifnum\bookmarkget{level}=-1
+\bookmarksetup{color=ocre,bold}
+\fi
+}
+}
+
+
+\newcommand{\ChapterNLPFundations}{0}
+\newcommand{\ChapterMLFundations}{1}
+\newcommand{\ChapterNNFundations}{2}
+\newcommand{\ChapterWords}{3}
+\newcommand{\ChapterSequences}{4}
+\newcommand{\ChapterEncDec}{5}
+\newcommand{\ChapterTransformer}{6}
+\newcommand{\ChapterPretraining}{7}
+\newcommand{\ChapterLLM}{8}
+\newcommand{\ChapterLLMPrompting}{9}
+\newcommand{\ChapterLLMTuning}{10}
+\newcommand{\ChapterLLMInference}{11}

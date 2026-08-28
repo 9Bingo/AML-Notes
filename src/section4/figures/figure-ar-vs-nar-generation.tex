@@ -1,0 +1,145 @@
+% !Mode:: "TeX:UTF-8"
+% !TEX encoding = UTF-8 Unicode
+
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+	
+\def\stepsize{0.9cm}
+\def\boxsize{1.3}
+\def\smallsize{0.13}
+\def\yslant{0.6}
+\def\xslant{0.0}
+
+\tikzstyle{snode} = [fig/module,minimum width=0.28cm,minimum height=0.28cm,inner sep=0pt]
+
+% autoregressive generation
+\begin{scope}
+
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s11) at (0,0) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s12) at ([xshift=\stepsize]s11) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s13) at ([xshift=\stepsize]s12) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s14) at ([xshift=\stepsize]s13) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=gray!20] (s15) at ([xshift=\stepsize]s14) {};
+%\node [circle,inner sep=0,minimum size=5pt,fill=gray!20] (s16) at ([xshift=\stepsize]s15) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=gray!20] (s21) at ([yshift=1.2*\stepsize]s11) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=gray!20] (s22) at ([xshift=\stepsize]s21) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=gray!20] (s23) at ([xshift=\stepsize]s22) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s24) at ([xshift=\stepsize]s23) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=gray!20] (s25) at ([xshift=\stepsize]s24) {};
+%\node [circle,inner sep=0,minimum size=5pt,fill=gray!20] (s26) at ([xshift=\stepsize]s25) {};
+
+\draw [-{Stealth[length=1.3mm]}] (s11.30) -- (s24.210);
+\draw [-{Stealth[length=1.3mm]}] (s12.50) -- (s24.230);
+\draw [-{Stealth[length=1.3mm]}] (s13.70) -- (s24.250);
+\draw [-{Stealth[length=1.3mm]}] (s14.90) -- (s24.270);
+
+\begin{pgfonlayer}{background}
+\node [fig/module,anchor=south,minimum width=6.5*\stepsize,minimum height=2.3*\stepsize] (llm) at ([xshift=0.5*\stepsize,yshift=-0.5*\stepsize]s13) {};
+\node [anchor=south west] (llmlabel) at (llm.north west) {\footnotesize{Transformer}};
+\end{pgfonlayer}
+
+\node [anchor=center] (w1) at ([yshift=-1.5*\stepsize]s11) {\small{$c_1$}};
+\node [anchor=center] (w2) at ([yshift=-1.5*\stepsize]s12) {\small{$c_2$}};
+\node [anchor=center] (w3) at ([yshift=-1.5*\stepsize]s13) {\small{$x_1$}};
+\node [anchor=center] (w4) at ([yshift=-1.5*\stepsize]s14) {\small{$x_2$}};
+\node [anchor=center] (w5) at ([yshift=-1.5*\stepsize]s15) {\color{gray!20} \small{$x_3$}};
+%\node [anchor=center] (w6) at ([yshift=-1.5*\stepsize]s16) {\color{gray!20} \small{$x_4$}};
+
+\draw [->] ([yshift=0.3cm]w1.center) -- ([yshift=0.7cm]w1.center);
+\draw [->] ([yshift=0.3cm]w2.center) -- ([yshift=0.7cm]w2.center);
+\draw [->] ([yshift=0.3cm]w3.center) -- ([yshift=0.7cm]w3.center);
+\draw [->] ([yshift=0.3cm]w4.center) -- ([yshift=0.7cm]w4.center);
+\draw [->,gray!20] ([yshift=0.3cm]w5.center) -- ([yshift=0.7cm]w5.center);
+%\draw [->,gray!20] ([yshift=0.3cm]w6.center) -- ([yshift=0.7cm]w6.center);
+
+\node [anchor=center] (x4) at ([yshift=1.6*\stepsize]s24) {\scriptsize{$\Pr(x_3|\mathbf{x}_{<3},\mathbf{c})$}};
+
+\draw [<-] ([yshift=-0.3cm]x4.center) -- ([yshift=-0.7cm]x4.center);
+
+\node [fig/caption,anchor=north] (caption) at ([yshift=-1.5cm]llm.south) {\footnotesize{(a) 自回归生成（单步）}};
+
+\end{scope}
+
+% non-autoregressive generation
+\begin{scope}[xshift=7.8cm]
+
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s11) at (0,0) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s11) at (0,0) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s12) at ([xshift=\stepsize]s11) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s13) at ([xshift=\stepsize]s12) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s14) at ([xshift=\stepsize]s13) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s15) at ([xshift=\stepsize]s14) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s16) at ([xshift=\stepsize]s15) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=gray!20] (s21) at ([yshift=1.2*\stepsize]s11) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=gray!20] (s22) at ([xshift=\stepsize]s21) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s23) at ([xshift=\stepsize]s22) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s24) at ([xshift=\stepsize]s23) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s25) at ([xshift=\stepsize]s24) {};
+\node [circle,inner sep=0,minimum size=5pt,fill=black] (s26) at ([xshift=\stepsize]s25) {};
+
+\draw [-{Stealth[length=1.3mm]}] (s11.50) -- (s23.230);
+\draw [-{Stealth[length=1.3mm]}] (s12.70) -- (s23.250);
+\draw [-{Stealth[length=1.3mm]}] (s13.90) -- (s23.270);
+\draw [-{Stealth[length=1.3mm]}] (s14.110) -- (s23.290);
+\draw [-{Stealth[length=1.3mm]}] (s15.130) -- (s23.310);
+\draw [-{Stealth[length=1.3mm]}] (s16.150) -- (s23.330);
+
+\draw [-{Stealth[length=1.3mm]}] (s11.30) -- (s24.210);
+\draw [-{Stealth[length=1.3mm]}] (s12.50) -- (s24.230);
+\draw [-{Stealth[length=1.3mm]}] (s13.70) -- (s24.250);
+\draw [-{Stealth[length=1.3mm]}] (s14.90) -- (s24.270);
+\draw [-{Stealth[length=1.3mm]}] (s15.110) -- (s24.290);
+\draw [-{Stealth[length=1.3mm]}] (s16.130) -- (s24.310);
+
+\draw [-{Stealth[length=1.3mm]}] (s11.20) -- (s25.190);
+\draw [-{Stealth[length=1.3mm]}] (s12.40) -- (s25.210);
+\draw [-{Stealth[length=1.3mm]}] (s13.60) -- (s25.230);
+\draw [-{Stealth[length=1.3mm]}] (s14.80) -- (s25.250);
+\draw [-{Stealth[length=1.3mm]}] (s15.90) -- (s25.270);
+\draw [-{Stealth[length=1.3mm]}] (s16.110) -- (s25.290);
+
+\draw [-{Stealth[length=1.3mm]}] (s11.10) -- (s26.170);
+\draw [-{Stealth[length=1.3mm]}] (s12.30) -- (s26.190);
+\draw [-{Stealth[length=1.3mm]}] (s13.50) -- (s26.210);
+\draw [-{Stealth[length=1.3mm]}] (s14.70) -- (s26.230);
+\draw [-{Stealth[length=1.3mm]}] (s15.80) -- (s26.250);
+\draw [-{Stealth[length=1.3mm]}] (s16.90) -- (s26.270);
+
+
+\begin{pgfonlayer}{background}
+\node [fig/module,anchor=south,minimum width=6.5*\stepsize,minimum height=2.3*\stepsize] (llm) at ([xshift=0.5*\stepsize,yshift=-0.5*\stepsize]s13) {};
+\node [anchor=south west] (llmlabel) at (llm.north west) {\footnotesize{Transformer}};
+\end{pgfonlayer}
+
+\node [anchor=center] (w1) at ([yshift=-1.5*\stepsize]s11) {\small{$c_1$}};
+\node [anchor=center] (w2) at ([yshift=-1.5*\stepsize]s12) {\small{$c_2$}};
+\node [anchor=center] (w3) at ([yshift=-1.5*\stepsize]s13) {\small{\uline{\hspace{0.3cm}}}};
+\node [anchor=center] (w4) at ([yshift=-1.5*\stepsize]s14) {\small{\uline{\hspace{0.3cm}}}};
+\node [anchor=center] (w5) at ([yshift=-1.5*\stepsize]s15) {\small{\uline{\hspace{0.3cm}}}};
+\node [anchor=center] (w6) at ([yshift=-1.5*\stepsize]s16) {\small{\uline{\hspace{0.3cm}}}};
+
+\draw [->] ([yshift=0.3cm]w1.center) -- ([yshift=0.7cm]w1.center);
+\draw [->] ([yshift=0.3cm]w2.center) -- ([yshift=0.7cm]w2.center);
+\draw [->] ([yshift=0.3cm]w3.center) -- ([yshift=0.7cm]w3.center);
+\draw [->] ([yshift=0.3cm]w4.center) -- ([yshift=0.7cm]w4.center);
+\draw [->] ([yshift=0.3cm]w5.center) -- ([yshift=0.7cm]w5.center);
+\draw [->] ([yshift=0.3cm]w6.center) -- ([yshift=0.7cm]w6.center);
+
+\node [anchor=center] (x3) at ([yshift=1.6*\stepsize,xshift=-0.3cm]s23) {\tiny{$\Pr(x_1|\mathbf{c})$}};
+\node [anchor=center] (x4) at ([yshift=1.6*\stepsize,xshift=-0.1cm]s24) {\tiny{$\Pr(x_2|\mathbf{c})$}};
+\node [anchor=center] (x5) at ([yshift=1.6*\stepsize,xshift=0.1cm]s25) {\tiny{$\Pr(x_3|\mathbf{c})$}};
+\node [anchor=center] (x6) at ([yshift=1.6*\stepsize,xshift=0.3cm]s26) {\tiny{$\Pr(x_4|\mathbf{c})$}};
+
+\draw [->] ([yshift=0.7cm]s23.center) -- ([yshift=1.1cm]s23.center);
+\draw [->] ([yshift=0.7cm]s24.center) -- ([yshift=1.1cm]s24.center);
+\draw [->] ([yshift=0.7cm]s25.center) -- ([yshift=1.1cm]s25.center);
+\draw [->] ([yshift=0.7cm]s26.center) -- ([yshift=1.1cm]s26.center);
+
+\node [fig/caption,anchor=north] (caption) at ([yshift=-1.5cm]llm.south) {\footnotesize{(b) 非自回归生成（单步）}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

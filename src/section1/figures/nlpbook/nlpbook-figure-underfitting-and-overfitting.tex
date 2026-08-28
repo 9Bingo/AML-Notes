@@ -1,0 +1,93 @@
+\input{figures/figure-theme.tex}
+\begin{center}
+
+  \begin{tikzpicture}[aml figure,scale=1]
+  \amlfigurepalette
+  \pgfmathsetseed{10}
+  \begin{scope}
+  \node [anchor=south west,minimum height=1em,minimum width=1em,inner sep=0.1pt] (n1) at (0,0) {};
+  \end{scope}
+ \begin{scope}[xshift=0cm]
+  \begin{axis}[
+      aml axis,
+      width=5.1cm, height=5.1cm,
+      title={Underfitting},
+      xlabel={$x_1$},
+      ylabel={$x_2$},
+      y label style={at={(axis description cs:0.25,.5)},anchor=south},
+      xmin=0, xmax=8,
+      ymin=0, ymax=8,
+      xtick={0,2,4,6,8},
+      ytick={0,2,4,6,8},
+  ]
+
+ \addplot[only marks,color=blue,very thick, mark=square,samples=12, domain=0.5:7.5,]{(0.5*x+3+rand};
+\addplot[only marks,color=red, very thick, mark=x,samples=12, domain=0.5:7.5, mark size=4pt]{(0.5*x+0.6+rand};
+\addplot[only marks,color=blue,very thick, mark=square,samples=12, domain=1:7]{(0.5*x+5+rand};
+\addplot[only marks,color=red, very thick, mark=x,samples=12, domain=1:7, mark size=4pt]{(0.5*x-1.4+rand};
+
+\addplot[color=red, very thick, mark=x,mark size=4pt,draw=none] coordinates {(1.3,1.9)(1.4,3.4)(4.8,5.6)(7.4,5)};
+\addplot[color=blue, very thick, mark=square] coordinates {(3.4,2.4)};
+
+\addplot[color=black, very thick, smooth] coordinates {(0,1.4)(3,1.8)(6,3)(8,7)};
+
+ \end{axis}
+\end{scope}
+
+\begin{scope}[xshift=4.8cm]
+\pgfmathsetseed{10}
+  \begin{axis}[
+      aml axis,
+      width=5.1cm, height=5.1cm,
+      title={Fitting just right},
+      xlabel={$x_1$},
+      ylabel={$x_2$},
+      y label style={at={(axis description cs:0.25,.5)},anchor=south},
+      xmin=0, xmax=8,
+      ymin=0, ymax=8,
+      xtick={0,2,4,6,8},
+      ytick={0,2,4,6,8},
+  ]
+
+ \addplot[only marks,color=blue, very thick, mark=square,samples=12, domain=0.5:7.5,]{(0.5*x+3+rand};
+\addplot[only marks,color=red, very thick, mark=x,samples=12, domain=0.5:7.5, mark size=4pt]{(0.5*x+0.6+rand};
+\addplot[only marks,color=blue,very thick, mark=square,samples=12, domain=1:7,]{(0.5*x+5+rand};
+\addplot[only marks,color=red, very thick, mark=x,samples=12, domain=1:7, mark size=4pt]{(0.5*x-1.4+rand};
+
+
+\addplot[color=red, very thick, mark=x,mark size=4pt,draw=none] coordinates {(1.3,1.9)(1.4,3.4)(4.8,5.6)(7.4,5)};
+\addplot[color=blue, very thick, mark=square] coordinates {(3.4,2.4)};
+\addplot[color=black, very thick, smooth] coordinates {(0,2.5)(3,3)(5,3.9)(8,6.2)};
+
+ \end{axis}
+\end{scope}
+
+\begin{scope}[xshift=9.6cm]
+\pgfmathsetseed{10}
+  \begin{axis}[
+      aml axis,
+      width=5.1cm, height=5.1cm,
+      title={Overfitting},
+      xlabel={$x_1$},
+      ylabel={$x_2$},
+      y label style={at={(axis description cs:0.25,.5)},anchor=south},
+      xmin=0, xmax=8,
+      ymin=0, ymax=8,
+      xtick={0,2,4,6,8},
+      ytick={0,2,4,6,8},
+  ]
+
+ \addplot[only marks,color=blue,very thick, mark=square,samples=12, domain=0.5:7.5,]{(0.5*x+3+rand};
+\addplot[only marks,color=red, very thick, mark=x,samples=12, domain=0.5:7.5, mark size=4pt]{(0.5*x+0.6+rand};
+\addplot[only marks,color=blue,very thick, mark=square,samples=12, domain=1:7,, ]{(0.5*x+5+rand};
+\addplot[only marks,color=red, very thick, mark=x,samples=12, domain=1:7, mark size=4pt]{(0.5*x-1.4+rand};
+
+\addplot[color=red, very thick, mark=x,mark size=4pt,draw=none] coordinates {(1.3,1.9)(1.4,3.4)(4.8,5.6)(7.4,5)};
+\addplot[color=blue, very thick, mark=square, ] coordinates {(3.4,2.4)};
+\addplot[color=black, very thick, smooth] coordinates {(0,1.4)(0.8,1.8)(1,3.8)(1.6,4)(3,2)(3.8,2.2)(4,3)(5,3.6)(5.6,4.8)(4.2,5.4)(4.4,6)(5,6)(6,5.2)(7,5.6)(8,6.4)};
+
+ \end{axis}
+\end{scope}
+
+  \end{tikzpicture}
+  \end{center}

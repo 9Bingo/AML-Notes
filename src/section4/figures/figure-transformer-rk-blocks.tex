@@ -1,0 +1,169 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+  \tikzstyle{input} = [rectangle, minimum width = 0.6cm, minimum height = 0.3cm, text centered]
+  \tikzstyle{output} = [rectangle, minimum width = 0.6cm, minimum height = 0.3cm, text centered]
+  \tikzstyle{function} = [fig/module primary,rectangle,minimum width = 0.65cm, minimum height = 0.34cm, text centered]
+  \tikzstyle{addition} = [circle, thick, minimum size = 0.2cm, text centered, draw = black]
+  \tikzstyle{arrow} = [fig/flow]
+  \tikzstyle{line} = [thick, -]
+  \tikzstyle{point}=[coordinate]
+\def\wsepf{1.4cm}
+\def\wseps{0.8cm}
+\def\wsept{0.6cm}
+
+  \begin{tikzpicture}[node distance = 0cm]
+  \begin{scope}
+  \node(output)[output]{\small{$\mathbf{x}_{k+1}$}};
+  \node(addition1)[addition,below of = output,yshift = -2.6cm]{};
+  \node(f1)[function,below of = addition1,xshift = \wsepf,yshift = -1.3cm]{\tiny $F$};
+  \node(input)[input,below of = addition1,yshift = -2.6cm]{\small{$\mathbf{x}_k$}};
+
+  \node(point1)[point,below of = addition1,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point2)[point,above of = addition1,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point3)[point,right of = addition1,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point4)[point,left of = addition1,xshift = 0cm, yshift = -0.1cm,align=center]{};
+
+  \draw [arrow] (input) -- (addition1);
+  \draw [arrow, rounded corners=3pt] (input.east) -| (f1.south);
+  \draw [arrow, rounded corners=3pt] (f1.north) |- (addition1);
+  \draw [arrow] (addition1) -- (output);
+  \draw [line] (point1) -- (point2);
+  \draw [line] (point3) -- (point4);
+
+  \node[fig/caption,font=\footnotesize] at ([xshift=1.4em,yshift=-1em]input.south) {(a) 预归一化};
+  \end{scope}
+
+  \begin{scope}[xshift=1.7in]
+  \node(output)[output]{\small{$\mathbf{x}_{k+1}$}};
+  \node(addition1)[addition,below of = output,yshift = -1.6cm]{};
+  \node(addition2)[addition,below of = addition1,yshift = -1.5cm]{};
+
+  \node(f1)[function,below of = addition2,xshift = \wseps,yshift = -0.9cm]{\tiny $F$};
+  \node(addition3)[addition,right of = f1,xshift = \wseps]{};
+  \node(f2)[function,above of = addition3,yshift = 0.9cm]{\tiny $F$};
+
+  \node(input)[input,below of = addition2,yshift = -2.1cm]{\small{$\mathbf{x}_k$}};
+
+  \node(point1)[point,below of = addition1,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point2)[point,above of = addition1,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point3)[point,right of = addition1,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point4)[point,left of = addition1,xshift = 0cm, yshift = -0.1cm,align=center]{};
+  \node(point5)[point,below of = addition2,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point6)[point,above of = addition2,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point7)[point,right of = addition2,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point8)[point,left of = addition2,xshift = 0cm, yshift = -0.1cm,align=center]{};
+  \node(point9)[point,below of = addition3,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point10)[point,above of = addition3,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point11)[point,right of = addition3,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point12)[point,left of = addition3,xshift = 0cm, yshift = -0.1cm,align=center]{};
+
+  \draw [arrow] (input) -- (addition2);
+  \draw [arrow, rounded corners=2pt] ([xshift=-0.0cm, yshift=0.15cm]input.east)  -| (f1.south);
+  \draw [arrow, rounded corners=2pt] (f1.north) node[above,xshift=-0.15cm,yshift=0.7cm, scale=0.9]{ $\frac {1}{2}$} |- (addition2);
+  \draw [arrow] (addition2) -- (addition1);
+  \draw [arrow] (addition1) -- (output);
+  \draw [arrow] (f1.east) --(f1.east)-- (addition3);
+  \draw [arrow, rounded corners=3pt] (input.east) -| (addition3);
+  \draw [arrow] (addition3) -- (f2.south);
+  \draw [arrow, rounded corners=3pt] (f2.north) |- node[above, xshift=-0.5cm,scale=0.9]{ $\frac {1}{2}$}(addition1);
+
+  \draw [line] (point1) -- (point2);
+  \draw [line] (point3) -- (point4);
+  \draw [line] (point5) -- (point6);
+  \draw [line] (point7) -- (point8);
+  \draw [line] (point9) -- (point10);
+  \draw [line] (point11) -- (point12);
+
+  \node[fig/caption,font=\footnotesize] at ([xshift=1.8em,yshift=-1em]input.south) {(b) RK2};
+  \end{scope}
+
+  \begin{scope}[xshift=3.4in]
+  \node(output)[output]{\small{$\mathbf{x}_{k+1}$}};
+  \node(addition1)[addition,below of = output,yshift = -0.8cm]{};
+  \node(addition2)[addition,below of = addition1,yshift = -1cm]{};
+  \node(addition3)[addition,below of = addition2,yshift = -1cm]{};
+  \node(addition4)[addition,below of = addition3,yshift = -1cm]{};
+
+  \node(f1)[function,below of = addition4,xshift = \wsept,yshift = -0.55cm]{\tiny $F$};
+  \node(addition5)[addition,right of = f1,xshift = \wsept*1.6]{};
+  \node(f2)[function,above of = addition5,yshift = 0.7cm]{\tiny $F$};
+  \node(addition6)[addition,right of = f2,xshift = \wsept*1.6]{};
+  \node(f3)[function,above of = addition6,yshift = 0.7cm]{\tiny $F$};
+  \node(addition7)[addition,right of = f3,xshift = \wsept*1.6]{};
+  \node(f4)[function,above of = addition7,yshift = 1cm]{\tiny $F$};
+
+  \node(input)[input,below of = addition4,yshift = -1.4cm]{\small{$\mathbf{x}_k$}};
+
+  \node(p1)[point,left of = addition6, yshift = -1.4cm,align=center]{};
+  \node(p2)[point,left of = addition7, yshift = -2.25cm,align=center]{};
+
+  \node(point1)[point,below of = addition1,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point2)[point,above of = addition1,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point3)[point,right of = addition1,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point4)[point,left of = addition1,xshift = 0cm, yshift = -0.1cm,align=center]{};
+  \node(point5)[point,below of = addition2,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point6)[point,above of = addition2,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point7)[point,right of = addition2,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point8)[point,left of = addition2,xshift = 0cm, yshift = -0.1cm,align=center]{};
+  \node(point9)[point,below of = addition5,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point10)[point,above of = addition5,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point11)[point,right of = addition5,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point12)[point,left of = addition5,xshift = 0cm, yshift = -0.1cm,align=center]{};
+  \node(point13)[point,below of = addition3,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point14)[point,above of = addition3,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point15)[point,right of = addition3,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point16)[point,left of = addition3,xshift = 0cm, yshift = -0.1cm,align=center]{};
+  \node(point17)[point,below of = addition4,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point18)[point,above of = addition4,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point19)[point,right of = addition4,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point20)[point,left of = addition4,xshift = 0cm, yshift = -0.1cm,align=center]{};
+  \node(point21)[point,below of = addition6,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point22)[point,above of = addition6,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point23)[point,right of = addition6,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point24)[point,left of = addition6,xshift = 0cm, yshift = -0.1cm,align=center]{};
+  \node(point25)[point,below of = addition7,xshift = 0.1cm, yshift = 0cm,align=center]{};
+  \node(point26)[point,above of = addition7,xshift = -0.1cm, yshift = 0cm,align=center]{};
+  \node(point27)[point,right of = addition7,xshift = 0cm, yshift = 0.1cm,align=center]{};
+  \node(point28)[point,left of = addition7,xshift = 0cm, yshift = -0.1cm,align=center]{};
+
+  \draw [arrow] (input) -- (addition4);
+  \draw [arrow, rounded corners=1pt] ([xshift=-0.1cm,yshift=0.15cm]input.east) -| (f1.south);
+  \draw [arrow, rounded corners=1pt] (f1.north) |-  node[above,pos=0.6,scale=0.9]{$\frac {1}{6}$}(addition4);
+  \draw [arrow] (f1.east) -- node[above,pos=0.5,scale=0.9]{$\frac {1}{2}$}(addition5);
+  \draw [arrow] (addition4) -- (addition3);
+  \draw [arrow] (addition3) -- (addition2);
+  \draw [arrow] (addition2) -- (addition1);
+  \draw [arrow] (addition1) -- (output);
+  \draw [arrow, rounded corners=2pt] ([xshift=-0.1cm, yshift=0.05cm]input.east) -| (addition5);
+  \draw [arrow] (addition5) -- (f2.south);
+  \draw [arrow, rounded corners=3pt] (f2.north) |- node[above,pos=0.75,scale=0.9]{$\frac {2}{6}$}(addition3);
+  \draw [arrow, rounded corners=3pt] ([xshift=-0.1cm, yshift=-0.05cm]input.east) -| (addition6);
+  \draw [arrow, rounded corners=3pt] ([xshift=-0.1cm, yshift=-0.15cm]input.east) -| (addition7);
+  \draw [arrow, rounded corners=3pt] (f3.north) |- node[above,pos=0.5,scale=0.9]{$\frac {2}{6}$}(addition2);
+  \draw [arrow, rounded corners=3pt] (f4.north) |-  node[above,scale=0.9]{$\frac {1}{6}$}(addition1);
+  \draw [arrow] (addition6) -- (f3.south);
+  \draw [arrow] (addition7) -- (f4.south);
+  \draw [arrow] (f2.east) -- node[above,pos=0.5,scale=0.9]{$\frac {1}{2}$}(addition6);
+  \draw [arrow] (f3.east) -- (addition7);
+
+  \draw [line] (point1) -- (point2);
+  \draw [line] (point3) -- (point4);
+  \draw [line] (point5) -- (point6);
+  \draw [line] (point7) -- (point8);
+  \draw [line] (point9) -- (point10);
+  \draw [line] (point11) -- (point12);
+  \draw [line] (point13) -- (point14);
+  \draw [line] (point15) -- (point16);
+  \draw [line] (point17) -- (point18);
+  \draw [line] (point19) -- (point20);
+  \draw [line] (point21) -- (point22);
+  \draw [line] (point23) -- (point24);
+  \draw [line] (point25) -- (point26);
+  \draw [line] (point27) -- (point28);
+
+  \node[fig/caption,font=\footnotesize] at ([xshift=4em,yshift=-1em]input.south) {(c) RK4};
+  \end{scope}
+
+  \end{tikzpicture}
+\end{document}

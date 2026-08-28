@@ -1,0 +1,27 @@
+\input{figures/figure-theme.tex}
+\begin{center}
+\begin{tikzpicture}[aml figure]
+\amlfigurepalette
+\begin{axis}[
+  aml axis,
+  width=11cm,height=5.6cm,
+  xlabel={模型复杂度},
+  ylabel={误差},
+  xmin=0,xmax=10,ymin=0,ymax=20,
+  xmajorticks=false,
+  ymajorticks=false,
+  legend style={at={(0.70,0.78)},anchor=west,draw=none},
+]
+\addplot[blue,line width=1.5pt,smooth] coordinates{
+  (0,18) (0.7,9) (1.5,5.5) (2.5,3.6) (4,2.2)
+  (5.5,1.5) (7,1.0) (9.5,0.8)};
+\addlegendentry{训练误差}
+\addplot[red,line width=1.5pt,smooth] coordinates{
+  (0,18) (0.7,10) (1.5,6.5) (2.5,4.4) (4,3.2)
+  (5.5,3.1) (7,4.6) (8.5,6.7) (9.5,8.5)};
+\addlegendentry{验证误差}
+\draw[dashed,FigureTeal,line width=.8pt] (axis cs:5.1,0) -- (axis cs:5.1,20);
+\node[anchor=south,FigureTeal] at (axis cs:5.1,17.2) {\footnotesize 合适复杂度};
+\end{axis}
+\end{tikzpicture}
+\end{center}

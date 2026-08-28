@@ -1,0 +1,354 @@
+% !TeX program = xelatex
+% 中文课程讲义 LaTeX 模板
+% 编译建议：XeLaTeX 或 LuaLaTeX。Windows / macOS / Linux 均可使用 ctex 自动处理中文字体。
+
+\documentclass[UTF8,a4paper,zihao=-4,oneside,openany]{ctexbook}
+% 页面与基础排版
+\usepackage[
+  top=2.6cm,
+  bottom=2.6cm,
+  left=2.7cm,
+  right=2.7cm,
+  headheight=15pt
+]{geometry}
+\usepackage{setspace}
+\setstretch{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.2em}
+\setlength{\emergencystretch}{3em}
+\sloppy
+% 数学、表格、图片
+\usepackage{amsmath,amssymb}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usepackage{pgfplots}
+
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usetikzlibrary{arrows.meta,backgrounds,decorations.pathreplacing,fit}
+
+\usepackage[numbers,sort&compress]{natbib}
+\pgfplotsset{compat=1.18}
+\bibliographystyle{plainnat}
+\usepackage{ulem}             % 提供 \uline 下划线命令（或使用 \underline）
+\graphicspath{{figures/}{images/}}
+
+% 颜色与强调框
+\usepackage[most]{tcolorbox}
+\usepackage{xcolor}
+\definecolor{CourseInk}{HTML}{1F2933}
+\definecolor{CourseBlue}{HTML}{24577A}
+\definecolor{CourseGreen}{HTML}{2D6A4F}
+\definecolor{CourseGold}{HTML}{A16207}
+\definecolor{CourseGray}{HTML}{F4F6F8}
+\definecolor{CourseLine}{HTML}{D9E2EC}
+\definecolor{ugreen}{rgb}{0,0.5,0}
+\definecolor{lolgreen}{RGB}{103,213,181}
+\definecolor{lolorange}{RGB}{246,179,82}
+\definecolor{lolpurple}{RGB}{200,158,196}
+
+\tcbset{
+  enhanced,
+  boxrule=0.6pt,
+  arc=2mm,
+  left=3mm,
+  right=3mm,
+  top=2mm,
+  bottom=2mm,
+  breakable
+}
+
+\newtcolorbox{learninggoals}{
+  colback=CourseGray,
+  colframe=CourseBlue,
+  title=学习目标,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{importantnote}{
+  colback=white,
+  colframe=CourseGreen,
+  title=重点提示,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{examplebox}[1][]{
+  colback=white,
+  colframe=CourseGold,
+  title=例题 #1,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{exercisebox}{
+  colback=CourseGray,
+  colframe=CourseLine,
+  title=课堂练习,
+  fonttitle=\bfseries\color{CourseInk}
+}
+
+% 页眉页脚与链接
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small 中文课程讲义}
+\fancyhead[R]{\small \leftmark}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\usepackage[
+  colorlinks=true,
+  linkcolor=CourseBlue,
+  urlcolor=CourseGreen,
+  citecolor=CourseGold
+]{hyperref}
+
+% 章节样式
+\ctexset{
+  chapter = {
+    name = {第,讲},
+    number = \chinese{chapter},
+    format = \huge\bfseries\color{CourseBlue},
+    beforeskip = 0pt,
+    afterskip = 22pt
+  },
+  section = {
+    format = \Large\bfseries\color{CourseInk}
+  },
+  subsection = {
+    format = \large\bfseries\color{CourseInk}
+  }
+}
+
+% 常用命令
+\newcommand{\coursename}{中文课程名称}
+\newcommand{\semester}{2026 春季}
+\newcommand{\teacher}{授课教师}
+\newcommand{\school}{学校 / 机构名称}
+\newcommand{\lessondate}{\today}
+
+\newcommand{\blankline}{\par\noindent\rule{\linewidth}{0.4pt}\par}
+\newcommand{\keyword}[1]{\textbf{\color{CourseBlue}#1}}
+
+% 统一图片占位符：所有待补图片统一使用该占位框。
+\newcommand{\imageplaceholder}[2][5cm]{%
+  \fbox{%
+    \begin{minipage}[c][#1][c]{0.78\linewidth}
+      \centering
+      \textbf{图片占位}\\[0.45em]
+      {\small #2}
+    \end{minipage}%
+  }%
+}
+
+% 原讲义中多处使用 \mindex 标注术语，这里给出安全定义，避免未定义命令。
+\newcommand{\mindex}[1]{\textit{#1}}
+
+
+\begin{document}
+
+% % 封面
+% \begin{titlepage}
+%   \centering
+%   \vspace*{1.5cm}
+%   {\zihao{1}\bfseries\color{CourseBlue}\coursename\par}
+%   \vspace{0.8cm}
+%   {\zihao{3}\bfseries 课程讲义模板\par}
+%   \vspace{1.2cm}
+
+%   \imageplaceholder[0.24\textheight]{封面图：将图片命名为 \texttt{cover.jpg} 并放入 \texttt{figures/} 目录。}
+
+%   \vfill
+%   \begin{tabular}{rl}
+%     \textbf{教师：} & \teacher \\
+%     \textbf{学期：} & \semester \\
+%     \textbf{单位：} & \school \\
+%     \textbf{日期：} & \lessondate \\
+%   \end{tabular}
+%   \vspace*{1.2cm}
+% \end{titlepage}
+
+% 目录
+\frontmatter
+\pagestyle{plain}
+\tableofcontents
+\cleardoublepage
+
+% 正文
+\mainmatter
+\pagestyle{fancy}
+
+% \chapter{课程导论}
+
+% \begin{learninggoals}
+%   \begin{itemize}
+%     \item 了解本课程的学习目标、评价方式与课堂要求。
+%     \item 熟悉讲义中的例题、练习、阅读材料与作业模块。
+%     \item 掌握如何在模板中插入章节、表格、图片和重点提示。
+%   \end{itemize}
+% \end{learninggoals}
+
+% \section{课程说明}
+
+% 这里填写本讲的正文内容。中文可直接输入，不需要额外转码。若要突出关键词，可使用
+% \keyword{关键词强调}，也可以使用普通的 \textbf{加粗}、\emph{斜体} 等格式。
+
+% \begin{importantnote}
+%   这里可以写课堂重点、易错点、考试提示，或者需要学生特别记住的概念。
+% \end{importantnote}
+
+% \section{表格示例}
+
+% 表格建议使用 \texttt{booktabs} 提供的 \verb|\toprule|、\verb|\midrule|、\verb|\bottomrule|，
+% 视觉会比普通竖线表格更清爽。
+
+% \begin{table}[htbp]
+%   \centering
+%   \caption{课程安排示例}
+%   \label{tab:schedule}
+%   \begin{tabularx}{0.92\linewidth}{>{\centering\arraybackslash}p{2.3cm}X>{\centering\arraybackslash}p{2.8cm}}
+%     \toprule
+%     周次 & 主题 & 任务 \\
+%     \midrule
+%     第 1 周 & 课程导论与学习方法 & 阅读讲义 \\
+%     第 2 周 & 核心概念一 & 完成练习 \\
+%     第 3 周 & 核心概念二 & 小组讨论 \\
+%     \bottomrule
+%   \end{tabularx}
+% \end{table}
+
+% \section{图片示例}
+
+% 将图片放入 \texttt{figures/} 目录，然后用 \verb|\includegraphics| 插入。下面的示例会在
+% \texttt{figures/example.png} 存在时显示图片，否则显示一个占位框。
+
+% \begin{figure}[htbp]
+%   \centering
+%   \imageplaceholder{示例图片：将图片保存为 \texttt{figures/example.png}。}
+%   \caption{图片插入示例}
+%   \label{fig:example}
+% \end{figure}
+
+% \section{例题与练习}
+
+% \begin{examplebox}[1]
+%   这里放置例题内容。可以包含公式：
+%   \[
+%     a^2 + b^2 = c^2
+%   \]
+%   也可以写解题步骤或分析。
+% \end{examplebox}
+
+% \begin{exercisebox}
+%   \begin{enumerate}
+%     \item 请用自己的话概括本讲的三个重点。
+%     \item 根据表~\ref{tab:schedule}，说明第 2 周需要完成什么任务。
+%     \item 观察图~\ref{fig:example}，写出你能得到的信息。
+%   \end{enumerate}
+% \end{exercisebox}
+
+% \chapter{第二讲标题}
+
+% \section{知识点一}
+
+% 从这里开始写第二讲内容。新增章节时，复制下面结构即可：
+
+% \begin{verbatim}
+% \chapter{新的一讲}
+% \section{小节标题}
+% 正文内容……
+% \end{verbatim}
+
+% \subsection{更小的层级}
+
+% 如果一讲内部内容较多，可以继续使用 \verb|\subsection| 或 \verb|\subsubsection| 组织层次。
+
+% \section{长表格示例}
+
+% 如果表格跨页，可以使用 \texttt{longtable}。
+
+% \begin{longtable}{p{0.18\linewidth}p{0.34\linewidth}p{0.34\linewidth}}
+%   \caption{长表格结构示例}
+%   \label{tab:longtable}\\
+%   \toprule
+%   模块 & 内容 & 备注 \\
+%   \midrule
+%   \endfirsthead
+%   \toprule
+%   模块 & 内容 & 备注 \\
+%   \midrule
+%   \endhead
+%   课前 & 预习阅读材料 & 可附链接或二维码图片 \\
+%   课中 & 讲授、讨论、练习 & 建议加入例题与即时反馈 \\
+%   课后 & 作业、复盘、扩展阅读 & 可列出提交要求 \\
+%   \bottomrule
+% \end{longtable}
+
+
+
+
+\chapter{大模型预训练与微调方法}
+
+\input{section/3.0-introduction}
+
+\input{section/3.1-pretraining}
+
+\input{section/3.2-prompt}
+
+\input{section/3.3-finetune}
+
+\input{section/3.4-alignment}
+
+\input{section/3.5-reasoning}
+
+\input{section/3.6-summary}
+
+
+
+
+\appendix
+\chapter{附录}
+
+\section{常用 LaTeX 片段}
+
+\begin{verbatim}
+% 插入普通图片
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/your-image.png}
+  \caption{图片标题}
+\end{figure}
+
+% 插入三线表
+\begin{table}[htbp]
+  \centering
+  \caption{表格标题}
+  \begin{tabular}{lll}
+    \toprule
+    A & B & C \\
+    \midrule
+    内容 & 内容 & 内容 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+\end{verbatim}
+
+\backmatter
+\chapter{参考资料}
+
+这里可以列出教材、论文、网站或其他阅读材料。
+
+% 使用外部 BibTeX 数据库。请将 bibliography.bib 与本 .tex 文件放在同一目录。
+% 如果你的 bib 文件名不同，例如 refs.bib，请改成 \bibliography{refs}。
+\bibliography{bibliography}
+
+\end{document}

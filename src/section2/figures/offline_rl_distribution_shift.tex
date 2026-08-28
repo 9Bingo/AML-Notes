@@ -1,0 +1,266 @@
+\begin{tikzpicture}[
+    font=\small,
+    flow/.style={
+        draw=black,
+        -Latex,
+        line width=0.8pt
+    },
+    dashedflow/.style={
+        draw=black!70,
+        -Latex,
+        dashed,
+        line width=0.75pt
+    },
+    panel/.style={
+        draw=black,
+        rounded corners=5pt,
+        line width=0.8pt
+    },
+    titlebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=blue!6,
+        minimum height=0.72cm,
+        align=center,
+        line width=0.8pt
+    },
+    statebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=gray!6,
+        minimum width=4.8cm,
+        minimum height=0.9cm,
+        align=center,
+        line width=0.8pt
+    },
+    actionbox/.style={
+        draw=black,
+        rounded corners=3pt,
+        fill=green!7,
+        minimum width=2.1cm,
+        minimum height=0.95cm,
+        align=center,
+        line width=0.75pt
+    },
+    rarebox/.style={
+        draw=red!70!black,
+        rounded corners=3pt,
+        fill=red!7,
+        minimum width=2.1cm,
+        minimum height=0.95cm,
+        align=center,
+        line width=0.9pt
+    },
+    valuebox/.style={
+        draw=black,
+        rounded corners=3pt,
+        fill=blue!6,
+        minimum width=2.1cm,
+        minimum height=0.95cm,
+        align=center,
+        line width=0.75pt
+    },
+    highvaluebox/.style={
+        draw=red!70!black,
+        rounded corners=3pt,
+        fill=red!9,
+        minimum width=2.1cm,
+        minimum height=0.95cm,
+        align=center,
+        line width=0.9pt
+    },
+    policybox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=yellow!12,
+        minimum width=4.8cm,
+        minimum height=1.05cm,
+        align=center,
+        line width=0.8pt
+    },
+    warningbox/.style={
+        draw=red!70!black,
+        rounded corners=4pt,
+        fill=red!7,
+        minimum width=4.8cm,
+        minimum height=1.15cm,
+        align=center,
+        line width=0.9pt
+    },
+    notebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=gray!6,
+        minimum height=1.05cm,
+        align=center,
+        line width=0.8pt
+    }
+]
+
+% ==================================================
+% Overall title
+% ==================================================
+% \node[titlebox, minimum width=8.2cm] at (9.4,10.8)
+% {离线强化学习中的分布偏移与价值高估};
+
+% ==================================================
+% Left panel: data coverage
+% ==================================================
+\draw[panel, fill=green!2] (0.2,2.0) rectangle (6.0,10.1);
+
+\node[titlebox, minimum width=4.5cm] at (3.1,9.55)
+{\textbf{历史数据覆盖}};
+
+\node[statebox] at (3.1,8.25)
+{
+五子棋状态 $s_t$\\
+历史棋谱中的候选落子
+};
+
+\node[actionbox] (a1) at (1.65,6.75)
+{
+位置 $A$\\
+样本数：$120$
+};
+
+\node[actionbox] (a2) at (4.55,6.75)
+{
+位置 $B$\\
+样本数：$85$
+};
+
+\node[actionbox] (a3) at (1.65,5.25)
+{
+位置 $C$\\
+样本数：$46$
+};
+
+\node[rarebox] (a4) at (4.55,5.25)
+{
+位置 $D$\\
+样本数：$2$
+};
+
+\node[notebox, minimum width=4.9cm] at (3.1,3.25)
+{
+位置 $A$、$B$、$C$ 有较多数据支持\\
+位置 $D$ 在历史棋谱中很少出现
+};
+
+% ==================================================
+% Middle panel: value estimation
+% ==================================================
+\draw[panel, fill=blue!2] (6.5,2.0) rectangle (12.3,10.1);
+
+\node[titlebox, minimum width=4.5cm] at (9.4,9.55)
+{\textbf{价值模型估计}};
+
+\node[statebox] at (9.4,8.25)
+{
+价值网络计算\\
+$Q(s_t,a)$
+};
+
+\node[valuebox] (q1) at (7.95,6.75)
+{
+$Q(s_t,A)$\\
+$5.2$
+};
+
+\node[valuebox] (q2) at (10.85,6.75)
+{
+$Q(s_t,B)$\\
+$5.8$
+};
+
+\node[valuebox] (q3) at (7.95,5.25)
+{
+$Q(s_t,C)$\\
+$4.6$
+};
+
+\node[highvaluebox] (q4) at (10.85,5.25)
+{
+$Q(s_t,D)$\\
+$8.7$
+};
+
+\node[notebox, minimum width=4.9cm] at (9.4,3.25)
+{
+位置 $D$ 缺少数据支持\\
+但被价值模型赋予了最高估计
+};
+
+% ==================================================
+% Right panel: target policy shift
+% ==================================================
+\draw[panel, fill=orange!3] (12.8,2.0) rectangle (18.6,10.1);
+
+\node[titlebox, minimum width=4.5cm] at (15.7,9.55)
+{\textbf{目标策略偏移}};
+
+\node[policybox] (policy) at (15.7,8.05)
+{
+目标策略选择价值最大的动作\\
+$a_t=\arg\max_a Q(s_t,a)$
+};
+
+\node[policybox, fill=red!8] (selectd) at (15.7,6.25)
+{
+选择位置 $D$\\
+$\pi_{\theta}(D\mid s_t)$ 增大
+};
+
+\node[warningbox] (newstate) at (15.7,4.35)
+{
+进入历史数据很少覆盖的状态\\
+价值估计可能不再可靠
+};
+
+\node[notebox, minimum width=4.9cm] at (15.7,2.75)
+{
+离线训练无法通过新的环境交互\\
+及时验证并修正这一判断
+};
+
+% ==================================================
+% Arrows between panels
+% ==================================================
+% \draw[flow]
+% (6.05,6.15) --
+% node[above, align=center] {\footnotesize 训练价值模型}
+% (6.45,6.15);
+
+% \draw[flow]
+% (12.35,6.15) --
+% node[above, align=center] {\footnotesize 根据估计更新策略}
+% (12.75,6.15);
+
+% Right internal arrows
+\draw[flow] (policy.south) -- (selectd.north);
+\draw[flow] (selectd.south) -- (newstate.north);
+
+% Highlight rare action correspondence
+% \draw[dashedflow]
+% (a4.east)
+% .. controls (5.9,4.65) and (7.0,4.65)
+% .. (q4.west);
+
+% ==================================================
+% Bottom summary
+% ==================================================
+\node[
+    notebox,
+    fill=yellow!10,
+    minimum width=17.2cm,
+    minimum height=1.05cm
+] at (9.4,1.15)
+{
+数据覆盖不足
+$\longrightarrow$
+未知动作价值被高估
+$\longrightarrow$
+目标策略偏离行为数据分布
+};
+
+\end{tikzpicture}

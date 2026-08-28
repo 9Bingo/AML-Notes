@@ -1,0 +1,213 @@
+% figures/Chapter2/figure-cot-application-examples.tex
+% 由主文件通过以下命令读入：
+% \input{figures/Chapter2/figure-cot-application-examples}
+
+\begin{figure}[!t]
+\centering
+\setlength{\tabcolsep}{0pt}
+
+\begin{tabular}{@{}c@{\hspace{0.02\textwidth}}c@{}}
+
+% -------------------- (a) CSQA --------------------
+\begin{tcolorbox}[
+  breakable=false,
+  width=0.45\textwidth,
+  height=9cm,
+  valign=top
+]
+{\footnotesize
+Q: What home entertainment equipment requires cable?
+
+Answer Choices: (a) radio shack (b) substation
+(c) television (d) cabinet
+
+\vspace{0.2em}
+
+A: \textcolor[RGB]{154,245,175}{
+The answer must require cable. Of the above choices,
+only television requires cable.
+}
+So the answer is (c).
+
+\vspace{0.5em}
+
+Q: What type of person typically contracts illness?
+
+Answer Choices: (a) hospital (b) head (c) sick person
+(d) elderly person (e) doctor's office
+
+\vspace{0.2em}
+
+A: \textcolor[RGB]{154,245,175}{\uline{
+The answer must be a person susceptible to illness.
+Of the choices, ``elderly person'' is correct because
+they typically have weaker immune systems.
+}}
+\uline{So the answer is (d).}
+
+\par}
+\end{tcolorbox}
+
+&
+
+% -------------------- (b) StrategyQA --------------------
+\begin{tcolorbox}[
+  breakable=false,
+  width=0.45\textwidth,
+  height=9cm,
+  valign=top
+]
+{\footnotesize
+Q: Do hamsters provide food for any animals?
+
+\vspace{0.2em}
+
+A: \textcolor[RGB]{154,245,175}{
+Hamsters are prey animals. Prey are food for predators.
+Thus, hamsters provide food for some animals.
+}
+So the answer is yes.
+
+\vspace{0.5em}
+
+Q: Can you use Microsoft Office without internet?
+
+\vspace{0.2em}
+
+A: \textcolor[RGB]{154,245,175}{\uline{
+Yes, you can use Microsoft Office applications,
+although features like cloud storage and online
+collaboration require internet.
+}}
+\uline{So the answer is yes.}
+
+\par}
+\end{tcolorbox}
+
+\\[-0.2em]
+
+{\small (a) CSQA}
+&
+{\small (b) StrategyQA}
+
+\\[0.6em]
+
+% -------------------- (c) Dyck languages --------------------
+\begin{tcolorbox}[
+  breakable=false,
+  width=0.45\textwidth,
+  height=9cm,
+  valign=top
+]
+{\footnotesize
+Q: Complete the rest of the sequence, making sure that
+the parentheses are closed properly. Input: $[$ $\{$
+
+\vspace{0.2em}
+
+A: \textcolor[RGB]{154,245,175}{
+Let's think step by step.
+}
+
+\vspace{0.1em}
+
+0: empty stack
+
+\vspace{0.1em}
+
+1: $[$; stack: $[$
+
+\vspace{0.1em}
+
+2: $\{$; stack: $[$ $\{$
+
+\vspace{0.1em}
+
+So the answer is $\}$ $]$.
+
+\vspace{0.5em}
+
+Q: Complete the rest of the sequence, making sure that
+the parentheses are closed properly. Input: $<$ $[$ $[$
+
+\vspace{0.2em}
+
+A: \uline{\textcolor[RGB]{154,245,175}{
+Let's think step by step.
+}}
+
+\vspace{0.1em}
+
+\uline{0: empty stack}
+
+\vspace{0.1em}
+
+\uline{1: $<$; stack: $<$}
+
+\vspace{0.1em}
+
+\uline{2: $[$; stack: $<$ $[$}
+
+\vspace{0.1em}
+
+\uline{3: $[$; stack: $<$ $[$ $[$}
+
+\vspace{0.1em}
+
+\uline{So the answer is $]$ $]$ $>$.}
+
+\par}
+\end{tcolorbox}
+
+&
+
+% -------------------- (d) Last Letter Concatenation --------------------
+\begin{tcolorbox}[
+  breakable=false,
+  width=0.45\textwidth,
+  height=9cm,
+  valign=top
+]
+{\footnotesize
+Q: Take the last letters of the words in
+``Elon Musk'' and concatenate them.
+
+\vspace{0.2em}
+
+A: \textcolor[RGB]{154,245,175}{
+The last letter of ``Elon'' is ``n''.
+The last letter of ``Musk'' is ``k''.
+Concatenating them is ``nk''.
+}
+The answer is nk.
+
+\vspace{0.5em}
+
+Q: Take the last letters of each word in
+``Renata Mariela Mona Kristin'' and concatenate them.
+
+\vspace{0.2em}
+
+A: \textcolor[RGB]{154,245,175}{\uline{
+The last letter of ``Renata'' is ``a''.
+The last letter of ``Mariela'' is ``a''.
+The last letter of ``Mona'' is ``a''.
+The last letter of ``Kristin'' is ``n''.
+Concatenating them is ``aaan''.
+}}
+\uline{The answer is aaan.}
+
+\par}
+\end{tcolorbox}
+
+\\[-0.2em]
+
+{\small (c) Dyck languages}
+&
+{\small (d) Last Letter Concatenation}
+
+\end{tabular}
+
+\caption{四种不同推理任务中的 CoT，包括 CSQA、StrategyQA、戴克语言和末尾字母连接。CoT 部分用绿色突出显示。}
+\label{fig:cot-application-examples}
+\end{figure}

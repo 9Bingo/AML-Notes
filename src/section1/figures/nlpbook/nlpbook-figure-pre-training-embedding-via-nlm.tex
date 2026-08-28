@@ -1,0 +1,38 @@
+% !Mode:: "TeX:UTF-8"
+% !TEX encoding = UTF-8 Unicode
+\input{figures/figure-theme.tex}
+
+\begin{tikzpicture}[aml figure]
+\amlfigurepalette
+
+\tikzstyle{cnode} = [minimum width=6em,minimum height=4em,inner sep=5pt,fill=FigureWarm,rounded corners=2pt]
+\tikzstyle{snode} = [minimum width=8em,minimum height=8em,inner sep=5pt,fill=FigureMist,rounded corners=3pt]
+
+%% embedding table
+\node [cnode,anchor=center,draw=FigureCoral,line width=.9pt] (C) at (0,0) {{\color{FigureInk} $\mathbf{C} = \scriptsize{\begin{bmatrix} \bullet & \bullet \\ \bullet & \bullet \\ \bullet & \bullet \end{bmatrix}}$}};
+
+%% system A
+\node [snode,anchor=south,draw=FigureBlue,line width=1pt] (systemA) at ([yshift=-0.6em]C.south) {};
+\node [anchor=south] (systemAfunc) at ([yshift=0.7em]C.north) {\Large{$F_{\theta,\mathbf{C}}(\cdot)$}};
+\node [anchor=south] (systemAlabel) at ([yshift=0.2em]systemA.north) {\small{via language modeling}};
+\node [anchor=south] (systemAlabel2) at ([yshift=-0.2em]systemAlabel.north) {\small{Optimizing $\mathbf{C}$ and $\theta$}};
+\node [anchor=north] (systemAcaption) at ([yshift=-0.5em]systemA.south) {{\large Training Word Vectors}};
+
+%% optimized embedding table
+\node [cnode,anchor=west,draw=FigureCoral,line width=.9pt] (oC) at ([xshift=12em]C.east) {{\color{FigureInk} $\widehat{\mathbf{C}} = \scriptsize{\begin{bmatrix} \bullet & \bullet \\ \bullet & \bullet \\ \bullet & \bullet \end{bmatrix}}$}};
+
+%% system B
+\node [snode,anchor=south,draw=FigureTeal,line width=1pt] (systemB) at ([yshift=-0.6em]oC.south) {};
+\node [anchor=south] (systemBfunc) at ([yshift=0.7em]oC.north) {\Large{$G_{\pi,\widehat{\mathbf{C}}}(\cdot)$}};
+\node [anchor=south] (systemBlabel) at ([yshift=0.3em]systemB.north) {\small{on the new task}};
+\node [anchor=south] (systemBlabel2) at ([yshift=-0.2em]systemBlabel.north) {\small{Using optimized $\widehat{\mathbf{C}}$}};
+\node [anchor=north] (systemBcaption) at ([yshift=-0.5em]systemB.south) {{\large Applying Word Vectors}};
+
+%% arrow
+\draw [->,very thick,dotted] ([xshift=0.2em]C.east) -- ([xshift=-0.2em]oC) node [pos=0.5,above] {\scriptsize{optimized word vectors $\widehat{\mathbf{C}}$}};
+
+\end{tikzpicture}
+
+
+
+

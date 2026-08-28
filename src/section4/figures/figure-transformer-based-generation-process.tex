@@ -1,0 +1,114 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\sep{0.6}
+\def\ycoordp{4}
+\def\vectorsize{1cm}
+\def\smallsize{0.13}
+\def\yslant{0.6}
+\def\xslant{0.0}
+
+\tikzstyle{snode} = [fig/module,minimum width=3.8cm,minimum height=0.8cm]
+\tikzstyle{cnode} = [minimum width=0.3cm,minimum height=\vectorsize]
+
+\begin{scope}
+
+\coordinate (s11) at (0,0);
+\coordinate (s12) at ({0+\sep},0);
+\coordinate (s13) at ({0+2*\sep},0);
+\coordinate (s14) at ({0+3*\sep},0);
+\coordinate (s15) at ({0+4*\sep},0);
+\coordinate (s16) at ({0+5*\sep},0);
+\coordinate (s17) at ({0+6*\sep},0);
+
+\node [cnode,anchor=north,fill=orange!30] (v11) at (s11) {};
+\node [cnode,anchor=north,fill=orange!30] (v12) at (s12) {};
+\node [cnode,anchor=north,fill=orange!30] (v13) at (s13) {};
+\node [cnode,anchor=north,fill=ugreen!30] (v14) at (s14) {};
+\node [cnode,anchor=north,fill=ugreen!30] (v15) at (s15) {};
+\node [cnode,anchor=north,fill=ugreen!30] (v16) at (s16) {};
+\node [cnode,anchor=north,fill=ugreen!30] (v17) at (s17) {};
+
+\draw [->] ([yshift=0.3cm]s11) -- ([yshift=0.8cm]s11);
+\draw [->] ([yshift=0.3cm]s12) -- ([yshift=0.8cm]s12);
+\draw [->] ([yshift=0.3cm]s13) -- ([yshift=0.8cm]s13);
+\draw [->] ([yshift=0.3cm]s14) -- ([yshift=0.8cm]s14);
+\draw [->] ([yshift=0.3cm]s15) -- ([yshift=0.8cm]s15);
+\draw [->] ([yshift=0.3cm]s16) -- ([yshift=0.8cm]s16);
+\draw [->] ([yshift=0.3cm]s17) -- ([yshift=0.8cm]s17);
+
+\draw [decorate,decoration={brace,amplitude=5pt,mirror,raise=0}] ([xshift=-0.2cm,yshift=-\vectorsize-0.3cm]s11) -- ([xshift=0.2cm,yshift=-\vectorsize-0.3cm]s13) node[midway,yshift=-0.8cm,xshift=-0.2cm,align=center]{\scriptsize{上下文 $\mathbf{c}$ 的嵌入}\\[-2pt] \scriptsize{（即 $\mathbf{e}_c$）}};
+\draw [decorate,decoration={brace,amplitude=5pt,mirror,raise=0}] ([xshift=-0.2cm,yshift=-\vectorsize-0.3cm]s14) -- ([xshift=0.2cm,yshift=-\vectorsize-0.3cm]s17) node[midway,yshift=-0.8cm,xshift=0.2cm,align=center]{\scriptsize{目标序列的}\\[-2pt] \scriptsize{中间状态}};
+
+\draw [-] ([yshift=0.1cm,xshift=-0.2cm]s11) -- ([yshift=0.1cm,xshift=-0.4cm]s11) -- ([yshift=0.1cm-\vectorsize-0.2cm,xshift=-0.4cm]s11) -- ([yshift=0.1cm-\vectorsize-0.2cm,xshift=-0.4cm]s11) -- ([yshift=0.1cm-\vectorsize-0.2cm,xshift=-0.2cm]s11);
+\draw [-] ([yshift=0.1cm,xshift=0.2cm]s17) -- ([yshift=0.1cm,xshift=0.4cm]s17) -- ([yshift=0.1cm-\vectorsize-0.2cm,xshift=0.4cm]s17) -- ([yshift=0.1cm-\vectorsize-0.2cm,xshift=0.4cm]s17) -- ([yshift=0.1cm-\vectorsize-0.2cm,xshift=0.2cm]s17);
+
+\coordinate (s21) at (0,\ycoordp);
+\coordinate (s22) at ({0+\sep},\ycoordp);
+\coordinate (s23) at ({0+2*\sep},\ycoordp);
+\coordinate (s24) at ({0+3*\sep},\ycoordp);
+\coordinate (s25) at ({0+4*\sep},\ycoordp);
+\coordinate (s26) at ({0+5*\sep},\ycoordp);
+\coordinate (s27) at ({0+6*\sep},\ycoordp);
+
+\node [cnode,anchor=south,fill=orange!30] (v21) at (s21) {};
+\node [cnode,anchor=south,fill=orange!30] (v22) at (s22) {};
+\node [cnode,anchor=south,fill=orange!30] (v23) at (s23) {};
+\node [cnode,anchor=south,fill=ugreen!30] (v24) at (s24) {};
+\node [cnode,anchor=south,fill=ugreen!30] (v25) at (s25) {};
+\node [cnode,anchor=south,fill=ugreen!30] (v26) at (s26) {};
+\node [cnode,anchor=south,fill=ugreen!30] (v27) at (s27) {};
+
+\draw [<-] ([yshift=-0.3cm]s21) -- ([yshift=-0.8cm]s21);
+\draw [<-] ([yshift=-0.3cm]s22) -- ([yshift=-0.8cm]s22);
+\draw [<-] ([yshift=-0.3cm]s23) -- ([yshift=-0.8cm]s23);
+\draw [<-] ([yshift=-0.3cm]s24) -- ([yshift=-0.8cm]s24);
+\draw [<-] ([yshift=-0.3cm]s25) -- ([yshift=-0.8cm]s25);
+\draw [<-] ([yshift=-0.3cm]s26) -- ([yshift=-0.8cm]s26);
+\draw [<-] ([yshift=-0.3cm]s27) -- ([yshift=-0.8cm]s27);
+
+\draw [decorate,decoration={brace,amplitude=5pt,mirror,raise=0}] ([xshift=0.2cm,yshift=\vectorsize+0.3cm]s27) -- ([xshift=-0.2cm,yshift=\vectorsize+0.3cm]s24) node[midway,yshift=0.6cm,align=center] (scorelabel) {\scriptsize{得分函数}\\[-2pt] \scriptsize{或向量场}};
+
+\draw [-] ([yshift=-0.1cm,xshift=-0.2cm]s21) -- ([yshift=-0.1cm,xshift=-0.4cm]s21) -- ([yshift=-0.1cm+\vectorsize+0.2cm,xshift=-0.4cm]s21) -- ([yshift=-0.1cm+\vectorsize+0.2cm,xshift=-0.4cm]s21) -- ([yshift=-0.1cm+\vectorsize+0.2cm,xshift=-0.2cm]s21);
+\draw [-] ([yshift=-0.1cm,xshift=0.2cm]s27) -- ([yshift=-0.1cm,xshift=0.4cm]s27) -- ([yshift=-0.1cm+\vectorsize+0.2cm,xshift=0.4cm]s27) -- ([yshift=-0.1cm+\vectorsize+0.2cm,xshift=0.4cm]s27) -- ([yshift=-0.1cm+\vectorsize+0.2cm,xshift=0.2cm]s27);
+
+\node [anchor=west] (sp1label) at ([xshift=1.7cm]scorelabel) {\small{$\bar{\mathbf{s}}(t-\Delta t) \in \mathbb{R}^{d \times (n_c + n)}$}};
+\draw [->] (scorelabel.north) .. controls +(north:0.8cm) and +(north:0.8cm) .. (sp1label.north) node [pos=0.5,above] {\small{更新 $\bar{\mathbf{s}}(t)$}};
+
+\node [fig/module primary,anchor=south,minimum width=5cm,minimum height=2cm] (transformer) at ([yshift=1cm]s14) {\large{Transformer}};
+
+\node [anchor=west] (stlabel) at ([xshift=0.8cm,yshift=-0.5*\vectorsize]s17) {\small{$\bar{\mathbf{s}}(t) \in \mathbb{R}^{d \times (n_c + n)}$}};
+
+\node [snode,anchor=west,draw=blue] (st) at ([xshift=5.5cm,yshift=0.6cm]transformer.east) {\footnotesize{$t$ 时刻的演化}};
+
+\node [snode,anchor=south] (stp1) at ([yshift=2cm]st.north) {\footnotesize{$t-\Delta t$ 时刻的演化}};
+
+\node [anchor=center] (pdots) at ([yshift=1cm]stp1.north) {$\cdots$};
+
+\node [anchor=center] (mdots) at ([yshift=-2.0cm]st.south) {$\cdots$};
+
+\node [anchor=center,align=center] (sinitial) at ([yshift=-1cm]mdots.south) {\footnotesize{初始状态 $\bar{\mathbf{s}}(T)$}};
+
+\node [snode,anchor=center,draw=white] (final) at ([yshift=1cm]pdots.north) {\footnotesize{终态 $\bar{\mathbf{s}}(0)$}};
+
+\node [snode,anchor=center] (mapping) at ([yshift=1cm]final.north) {\footnotesize{映射为词元}};
+
+\node [anchor=center] (tokens) at ([yshift=1cm]mapping.north) {\footnotesize{词元序列 $\mathbf{x}$}};
+
+\draw [->,thick] (sinitial.north) -- (mdots.south);
+\draw [->,thick] (mdots.north) -- ([yshift=-3pt]st.south);
+\draw [->,thick] ([yshift=3pt]st.north) -- ([yshift=-3pt]stp1.south);
+\draw [->,thick] ([yshift=3pt]stp1.north) -- (pdots.south);
+\draw [->,thick] (pdots.north) -- ([yshift=0]final.south);
+\draw [->,thick] (final.north) -- ([yshift=-3pt]mapping.south);
+\draw [->,thick] ([yshift=3pt]mapping.north) -- (tokens.south);
+
+\draw [-,blue] ([xshift=-2pt,yshift=0.2cm]st.west) -- ([xshift=-1.5cm,yshift=3.5cm]st.west);
+\draw [-,blue] ([xshift=-2pt,yshift=-0.2cm]st.west) -- ([xshift=-1.5cm,yshift=-3.5cm]st.west);
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

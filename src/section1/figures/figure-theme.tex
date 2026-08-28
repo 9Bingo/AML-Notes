@@ -1,0 +1,58 @@
+% Shared visual language for figures in Chapter 1.
+\providecolor{FigureInk}{HTML}{263640}
+\providecolor{FigureBlue}{HTML}{347A9E}
+\providecolor{FigureTeal}{HTML}{3B8176}
+\providecolor{FigureCoral}{HTML}{C65F54}
+\providecolor{FigureGold}{HTML}{C49332}
+\providecolor{FigureLilac}{HTML}{746DA3}
+\providecolor{FigureMist}{HTML}{EDF3F5}
+\providecolor{FigureWarm}{HTML}{F8F0E4}
+\providecolor{FigureLine}{HTML}{B8C5CC}
+\providecolor{FigureMuted}{HTML}{6F7F88}
+
+\tikzset{
+  aml figure/.style={
+    line cap=round,
+    line join=round,
+    >={Stealth[length=5pt,width=4pt]},
+    every node/.append style={text=FigureInk}
+  },
+  aml soft node/.style={
+    draw=FigureInk!65,
+    fill=FigureMist,
+    line width=.7pt,
+    rounded corners=2pt
+  },
+  aml warm node/.style={
+    draw=FigureGold!75!FigureInk,
+    fill=FigureWarm,
+    line width=.7pt,
+    rounded corners=2pt
+  },
+  aml flow/.style={->,draw=FigureInk!75,line width=.8pt},
+  aml accent flow/.style={->,draw=FigureTeal,line width=1pt}
+}
+
+\pgfplotsset{
+  aml axis/.style={
+    axis line style={draw=FigureInk!75},
+    tick style={draw=FigureInk!65},
+    tick label style={text=FigureInk},
+    label style={text=FigureInk},
+    grid=major,
+    grid style={draw=FigureLine!55,line width=.25pt},
+    legend style={draw=none,fill=white,fill opacity=.88,text opacity=1}
+  }
+}
+
+% Remap the standard colors used by the source figures inside each picture.
+\providecommand{\amlfigurepalette}{%
+  \colorlet{blue}{FigureBlue}%
+  \colorlet{red}{FigureCoral}%
+  \colorlet{green}{FigureTeal}%
+  \colorlet{ugreen}{FigureTeal}%
+  \colorlet{orange}{FigureGold}%
+  \colorlet{purple}{FigureLilac}%
+  \colorlet{cyan}{FigureBlue}%
+  \colorlet{gray}{FigureLine}%
+}

@@ -1,0 +1,87 @@
+\begin{tikzpicture}[
+    font=\small,
+    box/.style={
+        draw=black,
+        rounded corners=4pt,
+        minimum width=3.0cm,
+        minimum height=0.75cm,
+        align=center
+    },
+    envbox/.style={
+        box,
+        fill=orange!10
+    },
+    agentbox/.style={
+        box,
+        fill=green!10
+    },
+    policybox/.style={
+        box,
+        fill=blue!3,
+        minimum width=2.4cm,
+        minimum height=0.9cm
+    },
+    flow/.style={
+        draw=black,
+        -Latex,
+        line width=0.8pt
+    },
+    smallflow/.style={
+        draw=black!80,
+        -Latex,
+        line width=0.7pt
+    }
+]
+
+% =========================
+% Nodes
+% =========================
+\node[envbox] (env) at (0,1.45) {环境};
+\node[agentbox] (agent) at (0,-1.55) {智能体};
+\node[policybox] (policy) at (0,0.0) {策略\\$\pi(a_t|s_t)$};
+
+% =========================
+% Outer interaction loop
+% =========================
+
+% action: agent -> environment, right side
+\draw[flow]
+    (agent.east)
+    -- ++(2.2,0)
+    -- ++(0,3.0)
+    -- (env.east);
+
+\node at (3.0,0.05) {动作$(a)$};
+
+% reward: environment -> agent, left side outer
+\draw[flow]
+    (env.west)
+    -- ++(-2.5,0)
+    -- ++(0,-3.0)
+    -- (agent.west);
+
+\node at (-4.75,0.05) {奖励$(r)$};
+
+% state: environment -> agent, left inner curved arrow
+\draw[flow]
+    (env.west)
+    .. controls (-2.55,0.65) and (-2.55,-0.65)
+    .. (agent.west);
+
+\node at (-3.05,0.05) {状态$(s)$};
+
+% =========================
+% Policy-Agent relation
+% =========================
+
+\draw[smallflow, dashed]
+    (policy.west)
+    .. controls (-1.85,-0.1) and (-1.85,-1)
+    .. (agent.north west);
+
+\draw[smallflow, dashed]
+    (agent.north east)
+    .. controls (1.85,-1.05) and (1.85,-0.25)
+    .. (policy.east);
+
+\end{tikzpicture}

@@ -1,0 +1,98 @@
+% 《ODE in Vision and Language》讲义配图的轻量视觉调整。
+% 保留原图的几何结构与阅读顺序，只统一纸色、语义色、线型和模块质感。
+\definecolor{FigInk}{HTML}{27323A}
+\definecolor{FigMuted}{HTML}{737F89}
+\definecolor{FigGrid}{HTML}{D4D9DE}
+\definecolor{FigCanvas}{HTML}{FBFCFD}
+\definecolor{FigPaper}{HTML}{F2F4F6}
+\definecolor{FigPrimary}{HTML}{496A9F}
+\definecolor{FigPrimaryLight}{HTML}{E5EBF4}
+\definecolor{FigSecondary}{HTML}{BE6874}
+\definecolor{FigSecondaryLight}{HTML}{F4E6E9}
+\definecolor{FigAccent}{HTML}{8D7AA8}
+\definecolor{FigAccentLight}{HTML}{ECE8F2}
+\definecolor{FigGreen}{HTML}{5C8B84}
+
+% 原绘图使用这些基础颜色表达语义；在不改动几何代码的前提下统一换肤。
+\colorlet{black}{FigInk}
+\colorlet{gray}{FigMuted}
+\colorlet{blue}{FigPrimary}
+\colorlet{red}{FigSecondary}
+\colorlet{orange}{FigAccent}
+\colorlet{green}{FigGreen}
+\colorlet{ugreen}{FigGreen}
+
+\tikzset{
+  every picture/.append style={
+    >=Latex,
+    line cap=round,
+    line join=round,
+    show background rectangle,
+    inner frame sep=4.5pt
+  },
+  background rectangle/.style={
+    fill=FigCanvas,
+    draw=FigGrid,
+    rounded corners=1.5pt,
+    line width=0.42pt
+  },
+  every node/.append style={
+    font=\sffamily,
+    text=FigInk
+  },
+  every path/.append style={
+    draw=FigInk
+  },
+  fig/module/.style={
+    draw=FigInk!68,
+    fill=FigPaper,
+    rounded corners=1.8pt,
+    line width=0.78pt,
+    inner xsep=8pt,
+    inner ysep=5.5pt
+  },
+  fig/module primary/.style={
+    fig/module,
+    draw=FigPrimary,
+    fill=FigPrimaryLight
+  },
+  fig/module secondary/.style={
+    fig/module,
+    draw=FigSecondary,
+    fill=FigSecondaryLight
+  },
+  fig/flow/.style={
+    -{Latex[length=2.15mm,width=1.45mm]},
+    draw=FigInk,
+    line width=0.78pt
+  },
+  fig/flow primary/.style={
+    fig/flow,
+    draw=FigPrimary
+  },
+  fig/flow secondary/.style={
+    fig/flow,
+    draw=FigSecondary,
+    dash pattern=on 3pt off 1.4pt
+  },
+  fig/guide/.style={
+    draw=FigMuted,
+    dash pattern=on 1.3pt off 1.8pt,
+    line width=0.45pt
+  },
+  fig/caption/.style={
+    font=\footnotesize\sffamily,
+    text=FigMuted,
+    align=center
+  },
+  fig/point/.style={
+    circle,
+    minimum size=5.4pt,
+    inner sep=0,
+    fill=FigCanvas,
+    draw=FigPrimary,
+    line width=0.85pt
+  }
+}
+
+\AtBeginDocument{\pagecolor{FigCanvas}\sffamily\color{FigInk}}

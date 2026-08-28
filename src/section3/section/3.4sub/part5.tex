@@ -1,0 +1,107 @@
+\noindent 基于人类偏好学习是当前对齐大语言模型有效且流行的方法，但标注偏好数据成本高昂。人类反馈不仅扩展性有限，还因其固有的主观性容易引入偏见。为此，AI 反馈方法可以突破人类标注的限制，提升可扩展性与一致性。
+
+生成偏好数据与生成指令微调数据类似，可直接利用大语言模型。给定输入，先让模型生成成对输出，再提示其为每对输出标注偏好。下面是一个让大语言模型为一对客服回复标注偏好标签的示例。
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+
+\begingroup
+\setlength{\leftskip}{2em}
+\setlength{\rightskip}{2em}
+
+设想一个客户服务场景，客户提出了如下请求。你将审阅两个回复，并指出哪一个更优。请注意，好的回复应礼貌、清晰、简洁，直接回应客户的关切，提供有用的信息或解决方案，并保持积极的语气。
+
+\vspace{0.3cm}
+
+请求：
+
+\vspace{0.1cm}
+
+\textit{您好，我注意到我的订单还没到，按计划几天前就该送达了。能否帮我查一下目前的状态？谢谢！}
+
+\vspace{0.2cm}
+
+回复 A：
+
+\vspace{0.1cm}
+
+\textit{非常抱歉给您造成延误，我完全理解这多么令人失望。我们正在尽最大努力尽快为您解决。}
+
+\vspace{0.3cm}
+
+回复 B：
+
+\vspace{0.1cm}
+
+\textit{嗨，这种事难免的！您的包裹该到的时候自然会到，不用着急。}
+
+\vspace{0.3cm}
+
+\underline{偏好回复 A。}
+
+\endgroup
+
+\end{tcolorbox}
+\vspace{0.5em}
+
+收集到偏好标签后，即可结合输出对和输入来训练奖励模型。为提升标注质量，可加入示例或采用思维链（CoT）等高级提示技术，例如在提示中展示带有推理过程的偏好示例。
+
+除了偏好标签，我们还可以获得每个标签的概率 \cite{lee-etal:2023rlaif}。一种简单做法是从模型输出的概率中提取标签 token（如“A”“B”）的概率，再使用 Softmax 等归一化技术转换为分布，以此作为训练奖励模型的逐点监督信号。
+
+数据生成虽然容易扩展，但准确性和多样性依然关键，这不仅关乎偏好标注，还涉及模型输入与输出的质量，通常需要借助不同模型、多样提示和上下文示例来保证 \cite{cui-etal:2024ultra}。\citet{dubois-etal:2024alpacafarm} 指出，无论通过人类反馈还是 AI 反馈训练，成对偏好数据的多样性都十分重要。
+
+AI 反馈高度可扩展且相对客观，但更适合有明确客观指标的任务。反之，当需要对齐人类价值观、主观偏好或复杂情境时，人类反馈更具优势。实践中可将二者结合，兼顾人类洞察与 AI 反馈的可扩展性。
+
+% \noindent 尽管从人类偏好中学习是对齐大语言模型的一种有效且流行的方法，但标注偏好数据的成本很高。使用人类反馈不仅面临可扩展性有限的问题，还可能引入偏见，因为人类反馈本质上是主观的。因此，可以转向 AI 反馈方法来解决这些可扩展性和一致性问题，而不受人类标注员的限制。
+
+% 与为指令微调生成数据一样，使用大语言模型生成偏好数据也很简单。给定一组输入，我们首先使用一个大语言模型生成成对的输出。然后，我们提示大语言模型为每对输出及其对应的输入标注偏好。下面是一个提示大语言模型为一对客户服务响应生成偏好标签的示例。
+
+% \vspace{0.5em}
+% \begin{tcolorbox}[frame empty]
+
+% \begingroup
+% \setlength{\leftskip}{2em}
+% \setlength{\rightskip}{2em}
+
+% Consider a customer service scenario where a customer poses a request. You will review two responses to this request. Please indicate which response is preferred. Note that a good response should be courteous, clear, and concise. It should address the customer's concern directly, provide helpful information or a solution, and maintain a positive tone.
+
+% \vspace{0.3cm}
+
+% Request:
+
+% \vspace{0.1cm}
+
+% \textit{Hello, I noticed that my order hasn't arrived yet, though it was scheduled to arrive several days ago. Could you please update me on its status? Thank you!}
+
+% \vspace{0.2cm}
+
+% Response A:
+
+% \vspace{0.1cm}
+
+% \textit{I'm very sorry for the delay and understand how disappointing this can be. We're doing our best to sort this out quickly for you.}
+
+% \vspace{0.3cm}
+
+% Response B:
+
+% \vspace{0.1cm}
+
+% \textit{Hey, stuff happens! Your package will get there when it gets there, no need to stress.}
+
+% \vspace{0.3cm}
+
+% \underline{Response A is preferred.}
+
+% \endgroup
+
+% \end{tcolorbox}
+% \vspace{0.5em}
+
+% 一旦收集到这些偏好标签，我们就可以将它们与输出对和输入一起用于训练奖励模型。当然，我们可以考虑展示一些示例或使用高级提示技术（如 CoT）来提高标注性能。例如，我们可以在提示中包含一个示例，根据 CoT 的基本原理说明两个响应中为何偏好其中一个以及如何偏好。
+
+% 除了偏好标签，我们还可以获得与每个标签相关的概率 \cite{lee-etal:2023rlaif}。一种简单的方法是从大语言模型输出的概率中提取标签 token（如"A"和"B"）的概率。然后，我们可以使用 Softmax 函数或其他归一化技术将这些概率重新归一化为标签上的分布。这些偏好标签的概率可以作为训练奖励模型的逐点监督信号。
+
+% 对于数据生成，虽然很容易扩大规模，但通常需要确保数据的准确性和多样性。在这里，数据质量和多样性问题不仅涉及偏好标注，还涉及模型的输入和输出。因此，我们通常需要使用各种技术来获取大规模、高质量的数据。例如，可以通过使用不同的大语言模型、提示、上下文演示等来生成多样化的模型输出和注释 \cite{cui-etal:2024ultra}。\citet{dubois-etal:2024alpacafarm} 报告称，无论是通过人类反馈还是 AI 反馈来训练大语言模型，成对偏好数据的可变性都很重要。
+
+% 虽然从 AI 反馈中学习具有高度可扩展性且通常是客观的，但这种方法更适合于那些有明确客观性能指标的定义明确的任务。相比之下，当需要将 AI 系统与人类价值观、偏好以及需要理解微妙或主观背景的复杂现实世界任务对齐时，从人类反馈中学习更具优势。这些方法可以结合起来训练大语言模型，使其既能受益于人类的洞察力，又能利用 AI 反馈的可扩展性。

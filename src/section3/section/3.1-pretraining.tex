@@ -1,0 +1,277 @@
+\section{大模型预训练技术}
+
+
+\subsection{语言建模方法}
+
+在引入严谨的定义之前，我们不妨先通过一个例子来理解语言建模在做什么。想象你正在读一句话的前半部分：\textit{``今天天气真''}。即便后续尚未给出，你大概已经能猜到接下来会是``好````不错''或``热''之类的词，而几乎不可能是``宪法````光合作用''或``平方根''。语言模型本质上就是在做这件``猜词''的事：给定上文，它估计每个候选词出现的概率，概率高的就是``合理''的续写，概率低的则不太可能出现在当前上下文之后。
+
+更形式化地来看，语言建模的目标是计算一个 token 序列整体出现的概率。设 $\{x_0,x_1,...,x_m\}$ 为一个 token 序列，其中 $x_0$ 为起始符号 $\langle s \rangle$（或记为 $\langle \mathrm{SOS} \rangle$）\footnote{在 BERT 模型中，起始符号也可以是 $[\mathrm{CLS}]$。}。根据链式法则，该序列的联合概率可分解为一系列条件概率的乘积：
+\begin{equation}
+\Pr(x_0,...,x_m) = \prod_{i=0}^{m} \Pr(x_{i}\,|\,x_0,...,x_{i-1})
+\label{eq:lm-basic-form}
+\end{equation}
+
+这一定义的直觉很简单：先把开头 $x_0$ 出现的概率算出来，再算``有了 $x_0$ 之后出现 $x_1$ 的概率''，接着算``在 $x_0$ 和 $x_1$ 已经有了的前提下出现 $x_2$ 的概率''……依此类推，整个句子的概率就是每一步条件概率的乘积\footnote{为处理 $i=0$ 的边界情况，约定 $\Pr(x_0|x_0,...,x_{i-1})\big|_{i=0}=\Pr(x_0)=1$，因此 $\Pr(x_0,...,x_m) = \Pr(x_1,...,x_m|x_0)$。}。
+
+在深度学习时代，语言建模的一种典型方法是用深度神经网络来估计这些条件概率：模型接收历史 token 序列 $x_0,...,x_{i-1}$ 作为输入，输出词汇表 $\mathcal{V}$ 上的概率分布（记为 $\Pr(\cdot|x_0,...,x_{i-1})$）。其中，$\Pr(x_i|x_0,...,x_{i-1})$ 即为该分布中对应 token $x_i$ 的概率值。
+
+有了训练好的语言模型后，最常见的操作是根据已有上下文预测下一个最可能出现的 token：
+\begin{equation}
+\hat{x}_i = \argmax_{x_i \in \mathcal{V}} \Pr(x_i\,|\,x_0,...,x_{i-1})
+\end{equation}
+
+将这一过程反复迭代，就构成了\emph{自回归生成}：每次选出当前最优的下一个 token，把它拼到上下文中，再以更新后的完整序列预测再下一个 token，如此递推。这一机制恰好对应了公式 (\ref{eq:lm-basic-form}) 中链式法则的逐项展开。
+
+为了直观说明上述过程，考虑一个简单的续写场景。假设模型已见过前缀 $\langle s \rangle$ \texttt{The}（起始符后的第一个词是``The''），接下来需要生成三个词。每一步的决策如下：
+
+\begin{table}[ht]
+\centering
+\begingroup
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{l|l|p{10cm}}
+\toprule
+\textbf{当前上下文} & \textbf{预测} & \textbf{解读} \\
+\midrule
+$\langle s \rangle$ \texttt{The} & \texttt{cat} & 模型评估 $\Pr(\cdot|\langle s \rangle\ \text{The})$ 分布后，\texttt{cat} 得分最高——``The''后面常接名词。\\
+\midrule
+$\langle s \rangle$ \texttt{The cat} & \texttt{sat} & 给定``The cat''，模型判断最合理的下一个词是动词 \texttt{sat}。\\
+\midrule
+$\langle s \rangle$ \texttt{The cat sat} & \texttt{on} & 有了``The cat sat''后，\texttt{on} 成为最高概率的续写（``sat on''是常见搭配）。\\
+\bottomrule
+\end{tabular}
+\endgroup
+\caption{语言模型基于前缀 $\langle s \rangle$ \texttt{The} 依次生成 \texttt{cat}、\texttt{sat}、\texttt{on} 的自回归过程。每一步中，模型根据当前上下文计算词汇表上的条件概率分布，并选出概率最大的词追加到上下文中；更新后的序列随即成为下一轮预测的输入。每一步的决策对应于链式分解中新增的一个条件概率因子。}
+\label{tab:lm-generation-example}
+\end{table}
+
+经过这三步，模型生成了序列 \texttt{The \ cat \ sat \ on}，而整句``The cat sat on''的联合概率正是各步条件概率的乘积。当然，基于同样的前缀，模型也可能在第一步选中 \texttt{dog}、第二步选中 \texttt{ran}，从而生成另一条合理的续写路径——这正是语言模型作为一个概率系统的灵活之处。
+
+接下来，我们将深入探讨 LLM 的构建、训练与应用。
+
+\subsection{大语言模型架构}
+\label{sec:decoder-only-transformers}
+
+上一节从概率的角度介绍了语言建模的目标。本节我们来回答一个更具体的问题：什么样的神经网络架构能够实现这一目标？
+
+图 \ref{fig:llm-transformer-decoder} 展示了当前主流 LLM 所采用的仅解码器（Decoder-only）Transformer 架构。尽管不同 LLM 在细节上各有所异，但它们共享同一个信息处理流水线：
+
+\begin{enumerate}
+  \item \textbf{嵌入}：输入 token 序列 $\{x_0,\dots,x_{m-1}\}$ 被转换为一组 $d$ 维向量 $\{\mathbf{e}_0,\dots,\mathbf{e}_{m-1}\}$，每个向量是 token 嵌入与位置嵌入之和。
+  \item \textbf{Transformer 块堆叠}：这些向量依次通过 $L$ 个结构相同的 Transformer 块。每经过一个块，序列中每个位置的表示都会吸收更多来自上下文的语义信息。记第 $\ell$ 个块的输出为 $\mathbf{H}^{\ell} \in \mathbb{R}^{m \times d}$，其第 $i$ 行就是位置 $i$ 在当前深度下的上下文表示。
+  \item \textbf{输出层}：最后一个块的输出 $\mathbf{H}^{L}$ 通过一个 Softmax 层映射为词汇表上的概率分布：
+  \begin{equation}
+    \begin{bmatrix} \Pr(\cdot|x_0,\dots,x_{m-1}) \\ \vdots \\ \Pr(\cdot|x_0,x_1) \\ \Pr(\cdot|x_0) \end{bmatrix}
+    = \mathrm{Softmax}(\mathbf{H}^{L} \mathbf{W}^{o})
+    \label{eq:lm-output-layer}
+  \end{equation}
+  其中 $\mathbf{W}^{o} \in \mathbb{R}^{d \times |V|}$ 为输出投影矩阵。这恰好就是公式 (\ref{eq:lm-basic-form}) 中所需的每一步条件概率分布。
+\end{enumerate}
+
+每个 Transformer 块由两个核心子层构成：
+
+\begin{itemize}
+  \item \textbf{掩码多头自注意力}：让每个 token 能够聚合其前方所有 token 的信息。``掩码''确保位置 $i$ 只能看到位置 $0$ 到 $i$ 的内容——这正是条件概率 $\Pr(x_i|x_0,\dots,x_{i-1})$ 的``只看上文''要求。
+  \item \textbf{前馈神经网络}（FFN）：对每个位置的表示独立做非线性变换，为模型提供逐 token 的细粒度加工能力。
+\end{itemize}
+
+两个子层均配备\textbf{残差连接}：子层输出与其输入相加后再传递至下一阶段。这一设计使得信号即使在很深的网络中也能顺畅流动，是 LLM 能够堆叠数十乃至上百层的关键。
+
+\begin{figure}[!t]
+\centering
+\input{figures/Chapter1/figure-lm-decoder-only-architecture.tex}
+\caption{用于语言建模的 Transformer 解码器架构。核心组件为 $L$ 个堆叠的 Transformer 块，每个块包含一个掩码多头自注意力子层和一个 FFN 子层。输出层将最后一个块的上下文表示映射为下一个 token 的概率分布。}
+\label{fig:llm-transformer-decoder}
+\end{figure}
+
+自注意力层是整个架构的精髓。其核心直觉是：对每个位置 $i$，模型生成一个查询向量（Query），用它去``询问''所有前方位置 $k \le i$——每个前方位置用一个键向量（Key）来回应，匹配度越高，该位置的值向量（Value）在最终聚合中的权重就越大。形式化地：
+
+\begin{equation}
+  \mathrm{Att}_{\mathrm{qkv}}(\mathbf{Q},\mathbf{K},\mathbf{V}) =
+  \mathrm{Softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^{\mathrm{T}}}{\sqrt{d}} + \mathbf{Mask}\right)\mathbf{V}
+  \label{eq:qkv-attention-lm}
+\end{equation}
+
+其中 $\mathbf{Q},\mathbf{K},\mathbf{V} \in \mathbb{R}^{m \times d}$，$\mathbf{Mask}$ 确保 $i < k$ 时注意力权重为 0，除以 $\sqrt{d}$ 则用于稳定训练。
+
+为了使模型能同时关注不同类型的模式（例如一个头关注句法，另一个头关注语义），实际使用的是\textbf{多头注意力}：将 $\mathbf{Q}$、$\mathbf{K}$、$\mathbf{V}$ 投影到 $\tau$ 个不同的低维子空间中独立计算注意力，最后拼接：
+\begin{equation}
+  \mathrm{MHA}(\mathbf{H}) =
+  \big[\mathrm{head}_1 \,\|\, \cdots \,\|\, \mathrm{head}_{\tau}\big]\, \mathbf{W}^{\mathrm{head}},
+  \qquad
+  \mathrm{head}_j = \mathrm{Att}_{\mathrm{qkv}}(\mathbf{H}\mathbf{W}_j^{q},\,\mathbf{H}\mathbf{W}_j^{k},\,\mathbf{H}\mathbf{W}_j^{v})
+  \label{eq:multihead-attention}
+\end{equation}
+其中 $\mathbf{W}_j^{q},\mathbf{W}_j^{k},\mathbf{W}_j^{v} \in \mathbb{R}^{d \times d/\tau}$，$\mathbf{W}^{\mathrm{head}} \in \mathbb{R}^{d \times d}$。
+
+模型通过最大化对数似然 $\sum_{i=1}^{m} \log \Pr(x_i|x_0,\dots,x_{i-1})$ 进行训练。推理时采用自回归方式：模型输入当前序列，预测下一个 token $\hat{x}_i$，将其附加到序列尾部，再以更新后的序列预测 $\hat{x}_{i+1}$，反复进行直至生成结束符。
+
+表 \ref{tab:llm-model-size-comparison} 列出了近年来代表性 LLM 的深度 $L$、宽度 $d$ 及注意力头数等架构参数，帮助读者建立对模型规模的直观感受。
+
+\begin{table}[t]
+\centering
+\begingroup
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{l | r | r | r | r}
+LLM & \# of Params & Depth $L$ & Width $d$ & \# of Heads (Q/KV) \\ \hline
+GPT-2 \cite{radford-etal:2019language} & 1.5B & 48 & 1,600 & 25/25 \\
+GPT-3 \cite{brown-etal:2020language} & 175B & 96 & 12,288 & 96/96 \\ \hline
+\multirow{3}{*}{LLaMA3.1 \cite{dubey2024llama}}
+ & 8B & 32 & 4,096 & 32/8 \\
+ & 70B & 80 & 8,192 & 64/8 \\
+ & 405B & 126 & 16,384 & 128/8 \\ \hline
+\multirow{3}{*}{Qwen3 \cite{yang2025qwen3}}
+ & 0.6B & 28 & 1,024 & 16/8 \\
+ & 8B & 36 & 4,096 & 32/8 \\
+ & 235B$^\dagger$ & 94 & 4,096 & 64/4 \\ \hline
+Gemma3 \cite{gemmateam2025gemma3} & 27B & 62 & 5,376 & 32/16 \\ \hline
+DeepSeek-V3 \cite{liu2024deepseek} & 671B$^\dagger$ & 61 & 7,168 & 128/128 \\
+Mistral-Large-3 \cite{mistral2025mistral3} & 673B$^\dagger$ & 61 & 7,168 & 128/128
+\end{tabular}
+\endgroup
+\caption{部分大语言模型的架构参数对比。表中列出了各模型的参数量、层数（$L$）、隐藏维度（$d$）以及注意力头数（$a/b$ 表示 $a$ 个 Query 注意力头，$b$ 个 Key/Value 注意力头）。标记 $^\dagger$ 的模型采用混合专家（Mixture-of-Experts, MoE）架构，表中给出的是总参数量；推理时每 token 实际激活的参数量分别为 Qwen3-235B $\sim$22B、DeepSeek-V3 $\sim$37B、Mistral-Large-3 $\sim$41B。}
+\label{tab:llm-model-size-comparison}
+\end{table}
+
+\subsection{大语言模型预训练方法}
+
+直观地说，预训练的本质就是把海量文本"喂"给模型，让它反复练习"给定上文，猜下一个词"这项任务。这一朴素的目标——在数学上即最大化训练数据上的对数似然——正是驱动 LLM 获得强大语言能力的核心机制。
+
+\subsubsection{预训练数据}
+
+预训练首先需要大量的文本数据。如表 \ref{tab:training-data-size-llm} 所示，现代 LLM 在预训练阶段通常消耗数万亿乃至数十万亿个 token，远超传统 NLP 模型数个数量级。
+
+\begin{table}[t]
+\centering
+\begingroup
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{l | r | r}
+LLM & Year & \# of Tokens \\ \hline
+GPT-3-175B \cite{brown-etal:2020language} & 2020 & 0.5T \\
+LLaMA2-70B \cite{touvron-etal:2023llama} & 2023 & 2.0T \\
+LLaMA3-8B \cite{dubey2024llama} & 2024 & 15T \\
+DeepSeek-V3 \cite{liu2024deepseek} & 2024 & 14.8T \\
+Qwen3-235B \cite{yang2025qwen3} & 2025 & 36T
+\end{tabular}
+\endgroup
+\caption{部分 LLM 的预训练数据规模。}
+\label{tab:training-data-size-llm}
+\end{table}
+
+除了规模之外，预训练数据的质量与构成同样决定了模型最终的能力边界。训练语料通常来自多个渠道：
+
+\begin{itemize}
+  \item \textbf{网络爬取数据}：占比最大，但也包含大量低质量、重复甚至有害内容。已有工作表明 \cite{penedo-etal:2023refinedweb}，通过系统性的过滤和清洗，可剔除约 90\% 的原始爬取数据而不损害模型性能。高质量的过滤流程已成为现代 LLM 预训练数据管线中不可或缺的一环。
+  \item \textbf{书籍与学术论文}：提供连贯的长文本和深度知识，有助于模型习得复杂的语言结构和事实性知识。
+  \item \textbf{编程代码}：被证明是提升模型推理能力的关键。将代码纳入训练数据不仅能增强代码生成能力，还会显著改善模型在逻辑推理和多步骤任务上的表现，尤其是需要思维链（Chain-of-Thought）提示的复杂场景。
+  \item \textbf{多语言语料}：使单一模型能够处理多种语言。但低资源语种的表现仍然受限于对应语料的体量与质量。
+\end{itemize}
+
+需要指出的是，数据的多样性和质量之间需要谨慎权衡——过度过滤可能导致某些知识或语言现象的流失，而过滤不足则引入噪声。此外，训练数据中的偏见问题（如性别刻板印象）和隐私风险（如模型记忆并复现个人身份信息）也是数据准备阶段需要关注的工程挑战，通常通过数据去偏、匿名化处理以及部署阶段的安全防护系统加以缓解。
+
+\subsubsection{训练目标}
+
+预训练的核心数学目标简洁而自然：最大化模型在所有训练序列上逐 token 预测的对数似然。
+
+设训练集 $\mathcal{D}$ 由 $K$ 个 token 序列组成。对于任意序列 $\mathbf{x} = x_0\ldots x_m$，模型在该序列上的对数似然为：
+\begin{equation}
+  \mathcal{L}_{\theta}(\mathbf{x}) = \sum_{i=1}^{m} \log \Pr\nolimits_{\theta}(x_i \mid x_0,\dots,x_{i-1})
+  \label{eq:llm-training-loss}
+\end{equation}
+其中 $\theta$ 表示模型参数，$\Pr_{\theta}(x_i \mid x_0,\dots,x_{i-1})$ 正是上一节所定义的、由 Transformer 输出层 Softmax 给出的条件概率。预训练的目标是找到参数 $\hat{\theta}$ 使得整体对数似然最大：
+\begin{equation}
+  \hat{\theta} = \argmax_{\theta} \sum_{\mathbf{x} \in \mathcal{D}} \mathcal{L}_{\theta}(\mathbf{x})
+  \label{eq:llm-training-mle}
+\end{equation}
+
+在实际实现中，最大化对数似然等价于最小化交叉熵损失。具体而言，在序列的每个位置 $i$，模型输出一个概率分布 $\mathbf{p}_{i+1}^{\theta} = \Pr_{\theta}(\cdot|x_0,\dots,x_i)$，将其与真实 token $x_{i+1}$ 的 one-hot 分布 $\mathbf{p}_{i+1}^{\mathrm{gold}}$ 计算交叉熵，并沿所有位置求和。整个训练集上的优化目标为：
+\begin{equation}
+  \hat{\theta} = \argmin_{\theta} \sum_{\mathbf{x} \in \mathcal{D}} \sum_{i=0}^{m-1} \mathrm{CrossEntropy}\big(\mathbf{p}_{i+1}^{\theta},\; \mathbf{p}_{i+1}^{\mathrm{gold}}\big)
+  \label{eq:llm-training-loss-min}
+\end{equation}
+
+公式 (\ref{eq:llm-training-mle}) 与 (\ref{eq:llm-training-loss-min}) 在数学上完全等价，前者体现概率建模的视角，后者对应工程实现中的损失函数。通过优化得到的模型即可用于计算任意上下文下的 token 条件概率，进而支持自回归文本生成。
+
+
+\subsection{缩放定律}
+\label{sec:llm-training-at-scale}
+
+\subsubsection{缩放定律}
+
+直观而言，缩放定律（Scaling Laws）回答这样一个问题：如果我把模型做得更大、喂更多数据、投入更多算力，模型性能能提升多少？
+
+令 $\mathcal{L}$ 表示模型的测试损失（如交叉熵），$N$ 为模型参数量，$D$ 为训练数据量（以 token 计）。大量实验表明，$\mathcal{L}$ 与 $N$、$D$ 之间存在幂律（power-law）关系——即损失随资源的增加按幂函数规律下降：
+
+\begin{equation}
+  \mathcal{L}(N) = aN^{b}, \qquad \mathcal{L}(D) = cD^{d}
+  \label{eq:scaling-power-law-basic}
+\end{equation}
+
+其中 $a,b,c,d$ 为经验拟合参数，$b,d$ 均为负数（损失随规模增大而降低）。图 \ref{fig:power-law-scaling-for-model-size-and-dataset-size} 展示了这一关系的典型形态。
+
+\cite{kaplan-etal:2020scaling} 最早在语言模型中系统性地验证了这一规律。他们的核心发现是：在给定计算预算 $C$ 的条件下，模型性能主要由 $N$ 和 $D$ 共同决定，而非单独由其中一方主导。换言之，单纯增大模型而不配以足够的数据，边际收益会迅速衰减。
+
+在此基础上，\cite{hoffmann-etal:2022training} 提出了更为精确的 Chinchilla 缩放定律。他们将测试损失同时建模为 $N$ 和 $D$ 的函数，并加上一个不可消除的误差下界 $\epsilon_{\infty}$（不可约误差）：
+\begin{equation}
+  \mathcal{L}(N,D) = \frac{A}{N^{\alpha}} + \frac{B}{D^{\beta}} + \epsilon_{\infty}
+  \label{eq:scaling-chinchilla}
+\end{equation}
+其中通过大规模实验拟合得到 $\alpha \approx 0.34$、$\beta \approx 0.28$、$\epsilon_{\infty} \approx 1.69$。
+
+Chinchilla 缩放定律的核心洞见在于最优配比：对于一个给定的计算预算，模型参数 $N$ 与训练数据 $D$ 应当以相近的速度增长——这被称为"计算最优"（compute-optimal）训练策略。Chinchilla 的研究发现，此前的许多大模型（如 GPT-3 的某些版本）都是"参数过大而数据不足"的，同等算力下若减少参数并增加数据量，反而能获得更低的损失。
+
+\begin{importantnote}
+预训练的核心目标是最小化交叉熵损失，而缩放定律揭示了模型参数量与训练数据量必须同步增长才能获得最优性能。Chinchilla 定律指出，在给定算力下，参数和数据应等比例扩大，避免“大模型小数据”的低效配置。这一结论直接指导了后续模型规模和数据量的设计决策。
+\end{importantnote}
+
+\begin{figure}[!t]
+\centering
+\input{figures/Chapter1/figure-model-performance-against-model-size-and-training-dataset-size.tex}
+\caption{测试损失与模型参数量 $N$ 及训练数据量 $D$ 的关系。左：$\mathcal{L}(N) = \big( \frac{N}{8.8 \times 10^{13}} \big)^{-0.076}$；右：$\mathcal{L}(D) = \big( \frac{D}{5.4 \times 10^{13}} \big)^{-0.095}$。均基于 \cite{kaplan-etal:2020scaling} 报告的拟合结果。}
+\label{fig:power-law-scaling-for-model-size-and-dataset-size}
+\end{figure}
+
+缩放定律对于 LLM 研发布局具有重要的指导意义。其一，它使得在训练前即可大致预测给定资源配置下的模型表现，从而优化计算预算的分配。其二，它确认了"持续扩大规模"这一技术路线至今仍处于收益区间内——表 \ref{tab:training-data-size-llm} 所示的训练量从 0.5T 飙升至 36T，正是缩放定律驱动的结果。
+
+值得一提的是，$\mathcal{L}$ 的幂律下降还伴随着模型能力在质上的跃迁。\cite{wei-etal:2022emergent} 观察到，当模型规模突破某一阈值时，某些能力（如多步推理、上下文理解）会从接近随机水平骤升至显著优于 baseline——这一现象被称为涌现能力（emergent abilities）。涌现能力的存在，为缩放定律的实用价值提供了另一层佐证：不断扩张的模型规模不仅能带来量上的损失降低，更可能触发质的飞跃。
+
+\begin{figure}[!t]
+\centering
+\input{figures/Chapter1/figure-a-curve-of-scaling-laws}
+\caption{测试误差随训练数据量变化的缩放曲线 \cite{hestness-etal:2017deep}。在大多数实用区间内，误差按幂律衰减；当数据量极大时衰减趋缓，但误差始终存在一个大于零的下界（不可约误差）。}
+\label{fig:scaling-power-law-curve}
+\end{figure}
+
+\subsubsection{分布式训练}
+\label{sec:llm-distributed-training}
+
+现代 LLM 动辄数百亿乃至数千亿参数，单张 GPU 的显存远不足以装载完整模型，更无法在合理时间内完成训练。因此，分布式并行训练成为支撑 LLM 规模化的关键技术基石。当前主流方案包含三类并行策略，常组合使用（如 Megatron-LM 提出的三维并行 \cite{narayanan-etal:2021efficient}）：
+
+\medskip
+\noindent\textbf{数据并行}。数据并行是最基本、最广泛使用的并行策略。其思路简洁直观：将每个训练批次（mini-batch）拆分为 $N$ 份子批次，分发至 $N$ 个工作节点。每个节点持有完整的模型副本，独立完成前向和反向传播并计算局部梯度，随后通过通信操作（如 All-Reduce）聚合各节点的局部梯度，得到全局梯度后更新参数。在通信开销可忽略的理想条件下，数据并行能实现接近 $N$ 倍的训练加速。
+
+然而，数据并行的前提是每个节点能装下完整模型。随着模型参数量突破单卡显存上限，单纯的模型复制策略不再可行——此时需要在模型结构层面进行拆分，即模型层面的并行。
+
+\medskip
+\noindent\textbf{流水线并行}。流水线并行将模型的不同层（或层组）分配到不同设备上。一个直观但不实用的做法是让各层串行执行——这会导致任一时刻仅有一个设备在计算，其余全部空闲。流水线并行（如 GPipe \cite{huang-etal:2019gpipe}）通过引入微批次（micro-batch）机制来解决这一低效问题：将一个 mini-batch 进一步切分为若干个 micro-batch，各设备处理完当前 micro-batch 后立即传递给下游，随即开始处理下一个 micro-batch。这样一来，不同设备上的计算便在时间维度上实现了重叠，大幅减少了空闲时间。micro-batch 数量越多，流水线气泡（bubble）越小；但 batch 过小也会降低 GPU 算力利用率，需在实际部署中权衡。
+
+\medskip
+\noindent\textbf{张量并行}。张量并行从另一个维度切入：不拆分模型层，而是拆分单层内部的计算。以 FFN 子层中的矩阵乘法 $\mathbf{h} \mathbf{W}_h$ 为例（$\mathbf{W}_h \in \mathbb{R}^{d \times d_h}$），可将 $\mathbf{W}_h$ 沿列切分为 $M$ 个子矩阵 $\{\mathbf{W}_h^1,\dots,\mathbf{W}_h^M\}$，每块大小为 $d \times (d_h/M)$。于是：
+\begin{equation}
+  \mathbf{h} \mathbf{W}_h = \big[\,\mathbf{h} \mathbf{W}_h^1 \;\|\; \cdots \;\|\; \mathbf{h} \mathbf{W}_h^M \,\big]
+\end{equation}
+$M$ 个设备分别计算各自对应的子矩阵乘法，最后拼接即可得到与单设备计算完全一致的输出。这一思想同样适用于自注意力层中的 Q、K、V 投影矩阵。张量并行的优势在于：它将单个 GPU 无法容纳的大矩阵运算拆解为多个 GPU 上可并行执行的小矩阵运算，且数学上等价，不会引入额外的近似误差。
+
+\medskip
+\noindent\textbf{混合精度训练}。除并行策略外，降低单步计算开销同样至关重要。混合精度训练是最广泛采用的优化手段之一：在前向和反向传播中使用半精度（如 FP16 或 BF16）以加速计算，同时维护一份全精度（FP32）的主权重副本用于参数更新 \cite{micikevicius-etal:2018mixed}。这一技术在显著降低显存占用和计算时间的同时，通过损失缩放（loss scaling）等技巧保证了训练的数值稳定性。
+
+\medskip
+\noindent\textbf{实际挑战}。需要指出，分布式训练在工程实践中远不止并行策略选型那么简单。通信开销、节点同步延迟（慢节点拖累整体）、硬件故障容错、网络拓扑设计、计算与通信重叠（overlap）、负载均衡等问题，均对系统设计与调优提出严苛要求。在实际的大模型训练中，上述三类并行策略通常会被组合使用，以在算力、显存和通信三个维度间取得最优平衡。
+
+
+% \subsection{本章小结}
+
+% 回顾全章，大语言模型的技术体系可以被归纳为一个看似朴素的核心公式——链式法则将语言建模转化为条件概率的乘积，Transformer 架构为这一概率分解提供了可计算的神经网络实现，预训练则通过最大化对数似然将海量文本中的语言知识压缩进模型参数。换言之，LLM 并未依赖某种全新的理论突破，而是将"根据上文预测下一个词"这一简单目标，在足够大的模型和足够多的数据上执行到了极致。
+
+% 然而，"足够大"本身即是挑战。缩放定律告诉我们，性能随规模的提升仍处于幂律区间，训练数据量从 0.5T 膨胀到 36T 并非终点；分布式训练体系则让我们能够在工程上将这种规模扩张付诸实施。这意味着，当前 LLM 的能力边界并不由算法理论划定，而在相当程度上受制于算力、工程与数据的边界——这些边界仍在持续向外扩展。
+
+% 也正因如此，理解本章所介绍的基本原理并非终点，而是进一步探索 LLM 的起点：预训练完成后，模型如何被适配到具体任务？如何与人类偏好对齐？如何降低部署成本？这些将是后续章节所要回答的问题。

@@ -1,0 +1,23 @@
+\input{figures/figure-theme.tex}
+\begin{center}
+\begin{tikzpicture}[aml figure]
+\amlfigurepalette
+\foreach \r/\dy in {5.2/0.70,4.2/0.50,3.2/0.33,2.3/0.20,1.4/0.10,0.65/0.02}{
+  \draw[FigureLine,rotate=25,line width=.8pt] (0,\dy) ellipse ({\r} and {\r*0.45});
+}
+\coordinate (p1) at (-4.4,-2.0);
+\coordinate (p2) at (-3.5,-1.0);
+\coordinate (p3) at (-2.5,-1.35);
+\coordinate (p4) at (-1.8,-0.65);
+\coordinate (p5) at (-1.15,-0.82);
+\coordinate (p6) at (-0.70,-0.38);
+\coordinate (p7) at (-0.35,-0.30);
+\coordinate (p8) at (-0.08,-0.08);
+\foreach \i in {1,...,7}{
+  \draw[-stealth,FigureCoral,line width=1.2pt] (p\i) -- (p\the\numexpr\i+1\relax);
+}
+\fill[FigureInk] (0,0) ellipse (0.10 and 0.05);
+\node[font=\footnotesize,fill=FigureWarm,rounded corners=1pt,inner sep=2pt] at (0.72,0.25){最小值};
+\node[font=\footnotesize,FigureCoral] at (-3.8,-2.25){参数更新路径};
+\end{tikzpicture}
+\end{center}

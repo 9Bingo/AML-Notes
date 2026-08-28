@@ -1,0 +1,47 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\ssep{1.3cm}
+\def\bsep{2.5cm}
+
+\tikzstyle{lnode} = [fig/module,minimum width=3.0cm,minimum height=0.6cm,inner sep=2pt]
+
+\begin{scope}
+
+\node [fig/module primary,anchor=west,align=center,minimum height=1.2cm,minimum width=3.8cm] (corefunction) at (0,0) {\small{核心函数}\\[-2pt] \small{（MHSA 或 FFN）}};
+\node [fig/module,anchor=north,minimum height=0.8cm,minimum width=3.8cm] (layernorm) at ([yshift=-0.8cm]corefunction.south) {\small{层归一化}};
+\node [anchor=north] (input) at ([yshift=-1.2cm]layernorm.south) {$\mathbf{x}_l$};
+\node [anchor=south,circle,minimum size=0.6cm,draw,thick,inner sep=1pt] (res) at ([yshift=1.2cm]corefunction.north) {\Large{$+$}};
+\node [anchor=south] (output) at ([yshift=0.8cm]res.north) {$\mathbf{x}_{l+1} = \mathbf{x}_l + F(\mathbf{x}_l,\theta_l)$};
+
+\draw [->,thick] ([yshift=1pt]input.north) -- ([yshift=-1pt]layernorm.south);
+\draw [->,thick] ([yshift=1pt]layernorm.north) -- ([yshift=-1pt]corefunction.south);
+\draw [->,thick] ([yshift=1pt]corefunction.north) -- ([yshift=-1pt]res.south);
+\draw [->,thick] ([yshift=1pt]res.north) -- ([yshift=-1pt]output.south);
+\draw [->,thick] ([yshift=0.3cm,xshift=-1pt]input.north) -- ([yshift=0.3cm,xshift=-3.5cm]input.north) -- ([xshift=-3.5cm]res.center) -- ([xshift=-1pt]res.west);
+
+\begin{pgfonlayer}{background}
+\node [draw,thick,dotted,inner sep=0.5cm]  [fit = (corefunction) (layernorm)] (bigfunction) {};
+\node [anchor=center,draw,thick,dotted,fill=white,inner sep=2pt] (functionlabel) at ([xshift=0.5cm,yshift=0pt]bigfunction.north west) {\small{$F(\mathbf{x}_l,\theta_l)$}};
+\end{pgfonlayer}
+
+\node [anchor=west,align=left] (ode) at ([xshift=4cm,yshift=-0.3cm]res.east) {\small{ODE:}\\[1pt] \small{$\frac{d\mathbf{x}(t)}{dt} = f(\mathbf{x}(t), \theta(t))$}};
+
+\node [anchor=north west,align=left] (euler) at ([yshift=-0.5cm]ode.south west) {\small{Euler 方法：}\\[1pt] \small{$\mathbf{x}(t + \Delta t) = \mathbf{x}(t) + \Delta t \cdot f(\mathbf{x}(t), \theta(t))$}};
+
+\node [anchor=north east] (dynlabel) at ([yshift=-2.5cm,xshift=-0.3cm]euler.south east) {\footnotesize{系统动力学}};
+
+\draw [-] ([xshift=-0.1cm,yshift=1pt]euler.south east) -- ([xshift=-2.0cm,yshift=1pt]euler.south east);
+\draw [-] ([xshift=-0.5cm,yshift=0pt]euler.south east) -- ([xshift=-1.8cm,yshift=1pt]dynlabel.north east);
+\draw [-] ([xshift=1pt,yshift=1.5cm]bigfunction.south east) -- ([xshift=-2.3cm,yshift=1pt]dynlabel.north east);
+
+\node [anchor=north] (deltat) at ([yshift=-0.5cm,xshift=-0.2cm]euler.south) {\footnotesize{$\Delta t = 1$}};
+\draw [-] ([xshift=1.3cm,yshift=3pt]euler.south west) -- ([xshift=-0.2cm]deltat.north);
+\draw [-] ([xshift=3.2cm,yshift=3pt]euler.south west) -- ([xshift=0.2cm]deltat.north);
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

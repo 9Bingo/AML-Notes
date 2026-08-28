@@ -1,0 +1,259 @@
+\subsection{基于可校验奖励的强化学习方法}
+\label{sec:reasoning-verification}
+
+在推理增强中，我们通常需要一个验证器来判断中间步骤或最终答案的正确性，从而为强化学习提供奖励信号。常见的验证器有三类：给出步骤级标量分数的\mindex{过程奖励模型}（PRM），以自然语言输出评语的\mindex{生成式验证器}，以及依靠外部工具严格判断的\mindex{形式符号验证器}。下面我们依次介绍它们的工作原理和训练方式。
+
+\paragraph{1. 过程奖励模型}
+
+验证推理结果主要有两种范式：\mindex{结果奖励模型}（ORMs）和\mindex{过程奖励模型}（PRMs）\cite{uesato-etal:2022solving,lightman-etal:2024lets}。ORM 仅评估最终答案，虽然容易训练，但它存在“假阳性”问题。考虑一个简单的数学问题：
+
+\vspace{0.5em}
+\begin{quote}
+\textit{求解 $x$：$2x + 4 = 10$。}
+\end{quote}
+\vspace{0.5em}
+
+模型可能生成如下推理路径：
+\vspace{0.5em}
+\begin{quote}
+\textit{$2x + 4 = 10$ 意味着 $x$ 必须是 $10$ 的一半，即 $5$。}
+
+\textit{但是 $5 - 2 = 3$。}
+
+\textit{因此，$x = 3$。}
+\end{quote}
+\vspace{0.5em}
+
+虽然最终答案（$3$）正确，但逻辑步骤完全是错的。如果只用 ORM，这条路径可能获得高分，从而强化了错误的推理。为了解决这个问题，PRM 会评估路径中每一步的正确性。给定推理路径 $\mathbf{y} = \{\bar{\mathbf{y}}_1, \dots, \bar{\mathbf{y}}_{n_p}\}$，PRM 基于输入 $\mathbf{x}$ 和之前的步骤 $\bar{\mathbf{y}}_{<t}$，为当前步骤 $\bar{\mathbf{y}}_t$ 打一个正确性分数 $r_t$：
+\begin{eqnarray}
+r_t & = & v_{\mathrm{prm}}(\bar{\mathbf{y}}_t | \mathbf{x}, \bar{\mathbf{y}}_{<t}).
+\end{eqnarray}
+这里的 $v_{\mathrm{prm}}(\cdot)$ 是一个训练好的神经网络。整个路径的验证分数可以取所有步骤分的最小值（即只有“最薄弱的一环”也合理，才认为推理正确）：
+\begin{eqnarray}
+v(\mathbf{x}, \mathbf{y}) & = & \min_{1 \le t \le n_p} v_{\mathrm{prm}}(\bar{\mathbf{y}}_t | \mathbf{x}, \bar{\mathbf{y}}_{<t}).
+\end{eqnarray}
+当然也可以简单地对步骤分取平均。
+
+训练 PRM 需要步骤级的监督信号，构建训练数据通常有两种方法：
+
+\begin{itemize}
+\item \textbf{人工标注}：人类专家将模型生成的中间步骤标记为“正确”或“错误”。这种方法准确，但成本高、难以扩展，尤其在需要领域专家的高级任务上。
+\item \textbf{通过 Rollout 自动验证}：如果我们拥有已知最终答案的数据集，就可以用自动方法估计步骤价值 \cite{wang-etal:2024math}。从中间步骤 $\bar{\mathbf{y}}_t$ 出发，让模型继续生成多条完整路径。如果这些路径中很大比例最终得到了正确答案 $a^*$，我们就可以认为该步骤走在正确的轨道上。步骤的估计值 $\hat{r}_t$ 可以定义为达到正确答案的期望概率：
+    \begin{eqnarray}
+    \hat{r}_t & = & \mathbb{E}_{\mathbf{y}_{>t} \sim \pi_\theta} [ \mathbbm{1}(\mathrm{Extract}(\mathbf{y}_{>t}) = a^*) ].
+    \end{eqnarray}
+    有了这些估计值后，就可以训练 PRM 去预测 $\hat{r}_t$。
+\end{itemize}
+
+\paragraph{2. 生成式验证器}
+
+上面的验证器都需要修改模型架构并额外训练（例如加上分类头）。另一种自然的想法是直接利用大语言模型的文本生成能力来评价推理步骤，这就是\textbf{生成式验证}（generative verification）\cite{zheng-etal:2023judging}。它就像一位老师在试卷边缘写评语，而不只是给一个分数。
+
+为了看清它是怎么工作的，我们来看一个例子。假设模型在求解方程组：
+\vspace{0.5em}
+\begin{quote}
+\textit{问题：已知 $2x + y = 10$ 和 $x - y = 2$，求解 $x$ 和 $y$。}
+\end{quote}
+\vspace{0.5em}
+
+模型已经生成了两个正确的步骤：
+\vspace{0.5em}
+\begin{quote}
+\textit{从第二个方程，用 $y$ 表示 $x$：$x = y + 2$。}
+
+\textit{将 $x$ 代入第一个方程：$2(y + 2) + y = 10$。}
+\end{quote}
+\vspace{0.5em}
+
+接下来它尝试第三步，但出现了计算错误：
+\vspace{0.5em}
+\begin{quote}
+\textit{展开方程得到 $2y + 2 + y = 10$，化简为 $3y + 2 = 10$。}
+\end{quote}
+\vspace{0.5em}
+
+我们把问题、前两步以及当前步骤拼接起来，再加上一条验证指令（例如“给定前面的步骤，检查当前步骤中的逻辑是否正确并解释你的结论”），一起输入模型。生成式验证器可能会输出这样的文本评论：
+\vspace{0.5em}
+\begin{quote}
+\textit{评论：错误。分配 $2$ 到 $(y+2)$ 时必须对括号内每一项都乘以 $2$，应得到 $2y + 4$，而不是 $2y + 2$。正确展开为 $2y + 4 + y = 10$，化简为 $3y + 4 = 10$。}
+\end{quote}
+\vspace{0.5em}
+
+形式化地，设查询为 $\mathbf{z}$，验证指令为 $\mathbf{c}$，推理历史为 $\bar{\mathbf{y}}_{\le t}$。将它们拼接后输入大语言模型，即可生成评论 $\mathbf{p}_t$：
+\begin{eqnarray}
+\mathbf{p}_t & \sim & \Pr(\cdot | \mathbf{z}, \bar{\mathbf{y}}_{\le t}, \mathbf{c}).
+\end{eqnarray}
+这直接利用了预训练语言模型的生成能力，无需额外训练。图 \ref{fig:pre-generative-verfication} 展示了这一流程。
+
+\begin{figure}[!t]
+\centering
+\input{figures/Chapter5/figure-generative-verfication}
+\caption{生成式验证}
+\label{fig:pre-generative-verfication}
+\end{figure}
+
+当某些搜索算法需要数值分数时，我们可以测量模型在评论开头输出“正确”等指示词的概率，将验证分数定义为：
+\begin{eqnarray}
+v(\mathbf{z}, \bar{\mathbf{y}}_{\le t}, \mathbf{c}) & = & \Pr(y_{\mathrm{anchor}} = \text{``Correct''} | \mathbf{z}, \bar{\mathbf{y}}_{\le t}, \mathbf{c}).
+\end{eqnarray}
+
+与标量奖励模型相比，生成式验证器有几个优点。第一，它可解释——文本评语能清楚地说明判断依据，方便开发者诊断问题。第二，它支持自我纠正——评语通常会指出错误的具体位置和修正方法，模型可以直接据此修改当前状态，而不必丢弃整条路径。第三，它对架构的改动最小——同一个具有强大推理能力的大语言模型可以同时充当求解器和验证器。
+
+\paragraph{3. 形式符号系统作为验证器}
+
+神经验证器虽然强大，但仍然可能出现幻觉或逻辑错误。对于数学、代码等需要严格精确的任务，我们还可以使用\textbf{形式符号系统}作为验证器。例如，在代码优化中，形式化等价检查器（如 Alive2）可以自动验证新生成的代码是否保持了与原始代码完全相同的语义。这类系统严格遵循数学和逻辑规则，判断是 100\% 可靠的。
+
+要用上形式验证，模型必须将推理步骤生成为可执行代码或形式化陈述，而不仅仅是自然语言。比如，在解决数学问题时，模型可以写一个 Python 脚本来执行某步中间计算，然后由外部工具运行这段代码。验证分数可以直接基于执行是否成功来定义：
+\begin{eqnarray}
+v(\mathbf{x}, \bar{\mathbf{y}}_{<t}, \bar{\mathbf{y}}_t) & = & \begin{cases}
+1, & \text{if } E(\bar{\mathbf{y}}_t) \text{ executes successfully} \\
+0, & \text{otherwise}.
+\end{cases}
+\end{eqnarray}
+如果执行失败，形式环境通常会返回一条错误消息（如 \texttt{TypeError}），这条消息可以反馈给模型，帮助它理解错误并修正逻辑。
+
+这种方法完全消除了验证器本身产生“假阳性”的可能。不过，它也存在局限：它要求模型具备较强的编码或形式化能力，将抽象推理转化为严格代码并不容易；而且，对于写文章、规划旅行这类开放式任务，推理很难映射成刚性规则，形式系统并不适用。
+% \subsection{基于可校验奖励的强化学习方法}
+% \label{sec:reasoning-verification}
+
+% % 参考龙哥rl书的第5章
+% % 格式校验、结果奖励、GRPO
+% % 最后一小节可以讲大语言模型推理评估方法
+
+% 接下来，我们讨论推理中的验证问题。请注意，虽然我们在本节中重点关注推断时方法，但推理模型中使用的许多验证器仍然需要训练。因此，我们在接下来的讨论中也会介绍一些关于训练这些模型的细节。
+
+% \paragraph{1. 过程奖励模型}
+
+% 验证推理结果主要有两种范式：\mindex{结果奖励模型}（ORMs）和\mindex{过程奖励模型}（PRMs）\cite{uesato-etal:2022solving,lightman-etal:2024lets}。ORM仅评估推理路径的最终答案。虽然ORM更容易训练，但它们通常不足以胜任推理任务，因为它们存在“假阳性”（false positives）问题。为了说明这一点，考虑一个简单的数学问题：
+
+% \vspace{0.5em}
+% \begin{quote}
+% \textit{求解 $x$：$2x + 4 = 10$。}
+% \end{quote}
+
+% \vspace{0.5em}
+% 模型可能会生成以下推理路径：
+% \vspace{0.5em}
+
+% \begin{quote}
+% \textit{$2x + 4 = 10$ 意味着 $x$ 必须是 $10$ 的一半，即 $5$。}
+
+% \textit{但是 $5 - 2 = 3$。}
+
+% \textit{因此，$x = 3$。}
+% \end{quote}
+% \vspace{0.5em}
+
+% 虽然最终答案（$3$）是正确的，但逻辑步骤完全是错误的。如果我们只使用ORM，这条路径可能会获得高分，从而意外地强化了错误的逻辑。为了解决这个问题，我们可以使用PRM来评估推理路径中每个单独步骤的正确性。给定推理路径 $\mathbf{y} = \{\bar{\mathbf{y}}_1, \dots, \bar{\mathbf{y}}_{n_p}\}$，PRM在输入 $\mathbf{x}$ 和所有先前步骤 $\bar{\mathbf{y}}_{<t}$ 的条件下，为当前步骤 $\bar{\mathbf{y}}_t$ 分配一个正确性分数 $r_t$。我们可以将步骤级验证函数定义为：
+% \begin{eqnarray}
+% r_t & = & v_{\mathrm{prm}}(\bar{\mathbf{y}}_t | \mathbf{x}, \bar{\mathbf{y}}_{<t}).
+% \end{eqnarray}
+
+% \noindent 这里的 $v_{\mathrm{prm}}(\cdot)$ 是一个经过训练以预测正确性分数的神经网络。例如，我们可以在现有大语言模型的输出表示上附加一个简单的分类头（如线性层后接sigmoid激活函数）。
+
+% 为了确定整个推理路径的整体质量，我们可以聚合这些步骤级分数。一种简单的方法是取所有步骤中的最低分。换句话说，只有当其“最薄弱的环节”在逻辑上合理时，我们才认为推理是正确的。验证分数则由下式给出：
+% \begin{eqnarray}
+% v(\mathbf{x}, \mathbf{y}) & = & \min_{1 \le t \le n_p} v_{\mathrm{prm}}(\bar{\mathbf{y}}_t | \mathbf{x}, \bar{\mathbf{y}}_{<t}).
+% \end{eqnarray}
+
+% \noindent 或者，我们可以将验证分数定义为步骤级分数的平均值：
+% \begin{eqnarray}
+% v(\mathbf{x}, \mathbf{y}) & = & \frac{1}{n_p}\sum_{1 \le t \le n_p} v_{\mathrm{prm}}(\bar{\mathbf{y}}_t | \mathbf{x}, \bar{\mathbf{y}}_{<t}).
+% \end{eqnarray}
+
+% 为了训练验证模型，我们需要一个带注释的数据集。与训练只需要知道路径最末端最终正确答案的ORM不同，训练PRM需要步骤级的监督。构建PRM训练数据集有两种常用的方法：
+
+% \begin{itemize}
+% \item \vspace{0.5em} \textbf{人工标注}：人类专家手动解决问题，并将大语言模型生成的每个中间步骤标记为“正确”或“错误”。虽然这种方法可以产生准确的验证器，但成本高昂且难以扩展，特别是对于需要领域专家的高级数学或编码任务。
+% \item \vspace{0.3em} \textbf{通过Rollout（展开）进行自动验证}：我们也可以使用自动方法来估计步骤的价值 \cite{wang-etal:2024math}。例如，如果我们有一个已知最终答案的数据集（如数学竞赛），我们可以使用\mindex{蒙特卡洛rollout}。从中间步骤 $\bar{\mathbf{y}}_t$ 开始，我们提示大语言模型继续生成多条完整的路径。如果这些路径中有很大比例最终达到了正确的最终真实答案 $a^*$，我们可以假设中间步骤 $\bar{\mathbf{y}}_t$ 走在正确的轨道上。形式上，步骤的估计值 $\hat{r}_t$ 可以定义为达到正确答案的期望概率：
+%     \begin{eqnarray}
+%     \hat{r}_t & = & \mathbb{E}_{\mathbf{y}_{>t} \sim \pi_\theta} [ \mathbbm{1}(\mathrm{Extract}(\mathbf{y}_{>t}) = a^*) ].
+%     \end{eqnarray}
+%     \noindent 这里的 $\mathbf{y}_{>t}$ 是从 $\bar{\mathbf{y}}_t$ 开始的剩余路径，$\mathrm{Extract}(\mathbf{y}_{>t})$ 表示从路径 $\mathbf{y}_{>t}$ 中提取的答案。一旦通过这些rollout估计出这些值，就可以训练PRM来预测 $\hat{r}_t$。
+% \end{itemize}\vspace{0.5em}
+
+
+% \paragraph{2. 生成式验证器}
+
+% 上述所有验证器都需要额外的架构修改和训练工作，例如，我们需要训练一个分类头来输出数值分数。鉴于大语言模型强大的文本生成能力，另一种自然的方法是直接提示大语言模型评估推理步骤，并以自然语言生成验证反馈。这种方法被称为\textbf{生成式验证}（generative verification）\cite{zheng-etal:2023judging}。
+
+% 我们不是修改模型架构以输出单个标量值，而是将验证任务构建为一个标准的文本生成问题。通过将查询和中间步骤反馈给大语言模型，我们可以让它充当评判者。这意味着模型就像一位在试卷边缘写评语的老师，而不仅仅是给出一个最终分数。
+
+% 为了理解这是如何工作的，让我们看一个简单的例子。假设模型正在求解一个方程组：
+% \vspace{0.5em}
+% \begin{quote}
+% \textit{问题：给定 $2x + y = 10$ 和 $x - y = 2$，求解 $x$ 和 $y$。}
+% \end{quote}
+% \vspace{0.5em}
+
+% 我们假设模型已经生成了两个正确的步骤：
+% \vspace{0.5em}
+% \begin{quote}
+% \textit{从第二个方程，我们可以用 $y$ 表示 $x$：$x = y + 2$。}
+
+% \textit{将 $x$ 代入第一个方程：$2(y + 2) + y = 10$。}
+% \end{quote}
+% \vspace{0.5em}
+
+% 现在它正在尝试第三步，其中包含一个计算错误：
+
+% \vspace{0.5em}
+% \begin{quote}
+% \textit{展开方程得到 $2y + 2 + y = 10$，化简为 $3y + 2 = 10$。}
+% \end{quote}
+% \vspace{0.5em}
+
+% 我们可以将原始查询、步骤1和2以及当前步骤3与验证提示（例如，“\textit{给定前面的步骤，检查当前步骤中的逻辑是否正确并解释你的结论。}”）结合起来。然后，生成式验证器可能会输出这样的文本评论：
+% \vspace{0.5em}
+% \begin{quote}
+% \textit{评论：错误。在当前步骤中，将第2步中的 $2$ 分配到 $(y + 2)$ 上时，必须将括号内的两项都乘以 $2$。应该是 $2y + 4$，而不是 $2y + 2$。正确的展开是 $2y + 4 + y = 10$，化简为 $3y + 4 = 10$。}
+% \end{quote}
+% \vspace{0.5em}
+
+% 为了形式化这个生成式验证过程，我们假设原始输入 $\mathbf{x}$ 由查询 $\mathbf{z}$ 和指令 $\mathbf{c}$ 组成，该指令要求模型根据上下文验证该步骤。我们可以将查询 $\mathbf{z}$、推理历史 $\bar{\mathbf{y}}_{\le t}$ 和指令 $\mathbf{c}$ 拼接成一段长文本。然后，我们将这段文本作为输入馈送给大语言模型，并获得自然语言评论 $\mathbf{p}_t$：
+% \begin{eqnarray}
+% \mathbf{p}_t & \sim & \Pr(\cdot | \mathbf{z}, \bar{\mathbf{y}}_{\le t}, \mathbf{c})
+% \end{eqnarray}
+
+% \noindent 这里的 $\Pr(\cdot)$ 表示现有大语言模型建模的概率分布。因此，我们可以直接使用强大的大语言模型进行准确的验证而无需训练。图 \ref{fig:pre-generative-verfication} 说明了这种方法。
+
+% \begin{figure}[!t]
+% \centering
+% \input{figures/Chapter5/figure-generative-verfication}
+% \caption{生成式验证}
+% \label{fig:pre-generative-verfication}
+% \end{figure}
+
+% 虽然自然语言评论对人类很有用，但某些搜索算法（如树搜索）可能需要数值分数来对不同的推理路径进行排名。为了从生成式验证器中提取连续分数，一种常见的方法是测量模型在其评论的第一个词输出指示token（如“正确”或“错误”）的概率。因此，数值验证分数可以定义为：
+% \begin{eqnarray}
+% v(\mathbf{z}, \bar{\mathbf{y}}_{\le t}, \mathbf{c}) & = & \Pr(y_{\mathrm{anchor}} = \text{``Correct''} | \mathbf{z}, \bar{\mathbf{y}}_{\le t}, \mathbf{c})
+% \end{eqnarray}
+
+% \noindent 这里的 $y_{\mathrm{anchor}}$ 是指示token，通常使用启发式方法从输出文本中提取。
+
+% 生成式验证器比传统的标量奖励模型有几个优势。首先，它们为问题解决提供了可解释性。因为验证器用文本解释其推理，开发者可以诊断为什么接受或不接受某条推理路径。其次，它们支持自我纠正。由于文本评论通常会明确指出如何修复错误（例如在我们的例子中提供正确的展开式 $2y + 4$），推理系统可以直接整合这些反馈来纠正其当前状态并继续搜索，而不是简单地丢弃整条路径。第三，它们对架构的修改最小。只要当前的大语言模型具有强大的推理能力，完全相同的模型就可以同时用作问题解决者和验证器。
+
+% \paragraph{3. 形式符号系统作为验证器}
+
+% 虽然神经验证器被广泛使用，但它们有一个共同的弱点：它们仍然是神经网络。这意味着它们也可能产生幻觉或犯逻辑错误。对于需要严格精确度的任务，如复杂的数学或软件工程，我们也可以使用形式符号系统作为验证器。例如，在代码优化任务中，当模型尝试优化中间表示代码（如LLVM-IR）时，形式等价检查器（如Alive2）可以自动验证新生成的代码是否保持了与原始代码完全相同的语义。
+
+% 形式系统严格遵循预定义的数学和逻辑规则，因此它们的判断是100\%可靠的。要将形式系统用作验证器，大语言模型必须将其推理步骤生成为可执行代码或形式化数学陈述，而不仅仅是普通的自然语言。例如，在解决数学问题时，大语言模型可能会编写一个小的Python脚本来执行特定的中间计算。然后系统使用外部工具执行这段代码。验证过程非常直接：
+
+% \begin{itemize}
+% \item \vspace{0.5em} \textbf{成功}：如果代码无错误运行并产生有效输出，则该推理步骤被验证为正确。
+% \item \vspace{0.3em} \textbf{失败}：如果代码抛出错误（如语法错误或数学违规），则该推理步骤被验证为错误。
+% \end{itemize}
+% \vspace{0.5em}
+
+% 形式上，设中间步骤 $\bar{\mathbf{y}}_t$ 为生成的代码块或形式逻辑，设 $E$ 表示形式执行环境。验证分数可以定义为：
+% \begin{eqnarray}
+% v(\mathbf{x}, \bar{\mathbf{y}}_{<t}, \bar{\mathbf{y}}_t) & = & \begin{cases}
+% 1, & \text{if } E(\bar{\mathbf{y}}_t) \text{ executes successfully} \\
+% 0, & \text{otherwise}
+% \end{cases}
+% \end{eqnarray}
+
+
+% 这种方法有一个明显的优势：它消除了由验证器幻觉引起的“假阳性”。此外，当执行失败时，形式系统通常会生成一条错误消息（例如 \texttt{TypeError} 或编译失败）。这条错误消息可以反馈给大语言模型，帮助模型理解哪里出了问题，并在下一次尝试中纠正其逻辑。
+
+% 然而，使用形式符号系统也有其局限性。首先，它要求大语言模型具备强大的编码或形式化技能，因为将抽象推理转化为严格的代码是困难的。其次，虽然形式系统非常适合数学和编码，但它们不适用于开放式的现实世界任务（如写文章或计划旅行），在这些任务中，推理不能轻易映射到僵化的逻辑规则上。

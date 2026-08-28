@@ -1,0 +1,59 @@
+\begin{tikzpicture}
+
+\def\ssep{0.35cm}
+\def\bsep{1.45cm}
+
+\tikzset{
+  tnode/.style={minimum width=0.85cm,minimum height=0.32cm,inner sep=2pt,draw},
+  lnode/.style={minimum width=7.1cm,minimum height=0.95cm,inner sep=2pt,draw,thick,fill=gray!20}
+}
+
+\begin{scope}
+
+\node [tnode,anchor=west] (x1) at (0,0) {\small{Look}};
+\node [tnode,anchor=west] (x2) at ([xshift=\ssep]x1.east) {\small{out}};
+\node [tnode,anchor=west] (x3) at ([xshift=\ssep]x2.east) {\small{!}};
+\node [tnode,anchor=west] (x4) at ([xshift=\ssep]x3.east) {\small{小心}};
+\node [tnode,anchor=west] (x5) at ([xshift=\ssep]x4.east) {\small{!}};
+
+\node [lnode,anchor=south west] (l1) at ([xshift=-0.2cm,yshift=0.65cm]x1.north west) {};
+\node [lnode,anchor=south west] (l2) at ([yshift=\bsep]l1.south west) {};
+\node [lnode,anchor=south west] (l3) at ([yshift=\bsep]l2.south west) {};
+
+\node [anchor=center] at (l1.center) {\small{Transformer layer $l-1$}};
+\node [anchor=center] at (l2.center) {\small{Transformer layer $l$}};
+\node [anchor=center] at (l3.center) {\small{Transformer layer $l+1$}};
+
+\foreach \x in {x1,x2,x3,x4,x5} {
+  \draw [->,thin] (\x.north) -- ++(0,0.55cm);
+}
+
+\node [tnode,fill=red!20,draw=red,anchor=east] (p10) at ([xshift=-0.45cm,yshift=0.25cm]l1.west) {\small{$\mathbf{p}_0^{l-1}$}};
+\node [tnode,fill=red!20,draw=red,anchor=east] (p11) at ([xshift=-0.15cm,yshift=-0.25cm]l1.west) {\small{$\mathbf{p}_1^{l-1}$}};
+\node [tnode,fill=red!20,draw=red,anchor=east] (p20) at ([xshift=-0.45cm,yshift=0.25cm]l2.west) {\small{$\mathbf{p}_0^{l}$}};
+\node [tnode,fill=red!20,draw=red,anchor=east] (p21) at ([xshift=-0.15cm,yshift=-0.25cm]l2.west) {\small{$\mathbf{p}_1^{l}$}};
+\node [tnode,fill=red!20,draw=red,anchor=east] (p30) at ([xshift=-0.45cm,yshift=0.25cm]l3.west) {\small{$\mathbf{p}_0^{l+1}$}};
+\node [tnode,fill=red!20,draw=red,anchor=east] (p31) at ([xshift=-0.15cm,yshift=-0.25cm]l3.west) {\small{$\mathbf{p}_1^{l+1}$}};
+
+\foreach \p/\l in {p10/l1,p11/l1,p20/l2,p21/l2,p30/l3,p31/l3} {
+  \draw [->,thin] (\p.east) -- ([xshift=0.05cm]\l.west);
+}
+
+\node [anchor=east] (plabel) at ([xshift=-0.9cm]p20.west) {\small{trainable}};
+\node [anchor=north east] at ([yshift=0.08cm]plabel.south east) {\small{prefixes}};
+
+\node [tnode,anchor=south,fill=blue!10,draw=blue] (loss1) at ([yshift=0.55cm]l3.north) {\small{Loss}};
+\node [tnode,anchor=south,fill=blue!10,draw=blue] (loss2) at ([xshift=1.2cm,yshift=0.55cm]l3.north) {\small{Loss}};
+\draw [->,thin] ([xshift=-0.6cm]l3.north) -- (loss1.south);
+\draw [->,thin] ([xshift=0.6cm]l3.north) -- (loss2.south);
+
+\draw [decoration={brace,amplitude=4pt},decorate,thick]
+  ([yshift=-0.45cm]x3.east) -- ([yshift=-0.45cm]x1.west)
+  node [pos=0.5,below,yshift=-0.15cm] {\small{User input}};
+\draw [decoration={brace,amplitude=4pt},decorate,thick]
+  ([yshift=-0.45cm]x5.east) -- ([yshift=-0.45cm]x4.west)
+  node [pos=0.5,below,yshift=-0.15cm] {\small{LLM prediction}};
+
+\end{scope}
+
+\end{tikzpicture}

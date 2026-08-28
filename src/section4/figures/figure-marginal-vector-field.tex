@@ -1,0 +1,97 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\ssize{1}
+\def\boxsize{1.3}
+\def\smallsize{0.13}
+\def\yslant{0.6}
+\def\xslant{0.0}
+
+\tikzstyle{snode} = [fig/module,minimum width=0.28cm,minimum height=0.28cm,inner sep=0pt]
+
+\begin{scope}
+
+\begin{scope}[scale=0.8,
+every node/.append style={yslant=\yslant,xslant=\xslant},
+yslant=\yslant,xslant=\xslant]
+
+\coordinate (a00) at (-2.5,-2.5);
+\coordinate (a10) at (2.5,-2.5);
+\coordinate (a01) at (-2.5,2.5);
+\coordinate (a11) at (2.5,2.5);
+\coordinate (abase) at (0,-3);
+\coordinate (p1) at (-1.1,1.0);
+
+\draw [-,thick] (-2.5,-2.5) rectangle (2.5,2.5);
+\fill [white,fill opacity=.75] (-2.5,-2.5) rectangle (2.5,2.5);
+
+\draw[fill=orange!15,fill opacity=.2] (0,0) circle (2.0cm);
+\draw[fill=orange!30,fill opacity=.2] (0,0) circle (1.5cm);
+\draw[fill=orange!45,fill opacity=.2] (0,0) circle (1.0cm);
+\draw[fill=orange!60,fill opacity=.2] (0,0) circle (0.5cm);
+
+\pgfmathsetseed{42}
+
+\foreach \i  in {0,1,...,100}{
+    \pgfmathsetmacro{\myval}{360*rnd}
+    \pgfmathsetmacro{\myr}{1.9*rnd}
+    \node [circle,inner sep=0,minimum size=2pt,fill=black!50] (point1\i) at ({\myr*cos(\myval)},{\myr*sin(\myval)}) {};
+}
+
+\end{scope}
+
+\begin{scope}[xshift=8cm,scale=0.8,
+every node/.append style={yslant=\yslant,xslant=\xslant},
+yslant=\yslant,xslant=\xslant]
+
+\coordinate (b00) at (-2.5,-2.5);
+\coordinate (b10) at (2.5,-2.5);
+\coordinate (b01) at (-2.5,2.5);
+\coordinate (b11) at (2.5,2.5);
+\coordinate (bbase) at (0,-3);
+\coordinate (p2) at (-1.1,1.0);
+
+\foreach \i  in {0,1,...,100}{
+    \pgfmathsetmacro{\myval}{360*rnd}
+    \pgfmathsetmacro{\myr}{1.9*rnd}
+    \node [circle,inner sep=0,minimum size=2pt,fill=black!80] (point2\i) at ({\myr*cos(\myval)},{\myr*sin(\myval)}) {};
+}
+
+\foreach \i  in {0,1,...,100}{
+    \draw [-{Latex[scale=1.0]},thin,black!20] (point1\i) -- (point2\i);
+}
+
+\draw [-,thick,fill=white,fill opacity=.3] (-2.5,-2.5) rectangle (2.5,2.5);
+\fill [white,fill opacity=.75] (-2.5,-2.5) rectangle (2.5,2.5);
+
+\draw [black,fill=orange!15,fill opacity=.2] plot [smooth cycle, tension=0.5] coordinates {(0,1.9) (-1.5,1.6) (-2.0,0.6) (-2.1,-0.3) (-1.4,-1.6) (0,-2.0) (1.2,-1.3) (1.8,-0.8)  (2.1,-0.4) (2.0,0.4) (1.2,1.6) (0.9,2.0) };
+\draw [black,fill=orange!30,fill opacity=.2] plot [smooth cycle, tension=0.5] coordinates {(0,1.5) (-0.7,1.2) (-1.5,0.4) (-1.6,-0.2) (-1.0,-1.2) (0,-1.5) (0.9,-1.0) (1.1,-0.5)  (1.3,-0.2) (1.5,0.3) (0.6,1.3) };
+\draw [black,fill=orange!45,fill opacity=.2] plot [smooth cycle, tension=0.5] coordinates {(0,1.0) (-0.5,0.7) (-1.0,0.3) (-1.1,-0.1) (-0.7,-0.9) (0,-1.0) (0.6,-0.7) (0.8,-0.3)  (0.9,-0.1) (1.0,0.2) (0.5,0.8) };
+\draw [black,fill=orange!60,fill opacity=.2] plot [smooth cycle, tension=0.5] coordinates {(0,0.4) (-0.3,0.3) (-0.5,0.2) (-0.5,-0.0) (-0.4,-0.4) (0,-0.5) (0.4,-0.4) (0.6,-0.1)  (0.4,0.1) (0.2,0.4) };
+
+\end{scope}
+
+\node [circle,fill=blue,minimum size=4pt,inner sep=0] (point) at (3.5,-0.1) {};
+
+\coordinate (c0) at ([xshift=0.4cm,yshift=0.3cm]point);
+\coordinate (c1) at ([xshift=0.5cm,yshift=0.0cm]point);
+\coordinate (c2) at ([xshift=0.4cm,yshift=-0.3cm]point);
+
+\draw [-{Latex[scale=1.0]},shorten <= -0.5cm,black] (point) -- (c0);
+\draw [-{Latex[scale=1.0]},shorten <= -0.5cm,red,thick] (point) -- (c1);
+\draw [-{Latex[scale=1.0]},shorten <= -0.5cm,black] (point) -- (c2);
+
+\node [circle,fill=blue,minimum size=4pt,inner sep=0] (point2) at (3.5,-0.1) {};
+
+\node [anchor=north,align=center] (pointlabel) at ([yshift=-1.1cm]point.south) {\scriptsize{回归任意位置的}\\[-2pt] \scriptsize{速度期望}};
+
+\node [anchor=north] (ptlabel) at (0,-3.5) {\footnotesize{先验分布 $p_T$}};
+
+\node [anchor=north] (p0label) at (8,-3.5) {\footnotesize{数据分布 $p_0$}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,3292 @@
+% !TeX root = ../main.tex
+% 本文件由 section4/aml_notes_final.tex 抽取正文生成，保留章节目录独立性。
+
+\chapter{深度学习中的连续动力学机制}
+\chapterinfo[\href{https://www.techrxiv.org/doi/full/10.36227/techrxiv.177160477.75893679/v1}{\textit{Ordinary Differential Equations in Vision and Language}}]{张俊翔、叶凯阳、肖桐}
+
+\begin{learninggoals}
+  \begin{itemize}
+    \item 理解离散状态更新、连续动力系统与数值离散之间的双向联系，掌握常微分方程、初值问题、流映射和数值求解的基本概念。
+    \item 能够从连续深度视角解释残差网络与 Transformer 的表示演化，区分结构类比与严格等价，并理解 Neural ODE 及伴随灵敏度法的基本思想。
+    \item 掌握确定性概率输运的核心工具，能够说明连续性方程、连续归一化流与 Flow Matching 的训练目标及其差异。
+    \item 理解随机微分方程、反向 SDE、分数函数、去噪分数匹配与概率流 ODE 之间的关系，并能比较确定性与随机性生成轨迹。
+    \item 了解连续时间马尔可夫链和离散扩散的基本机制，能够比较嵌入空间扩散、词元空间扩散以及自回归与非自回归生成方案。
+    \item 能够结合稳定性、刚性、误差控制和采样效率，对不同连续动力学模型及其数值实现作出分析与选择。
+  \end{itemize}
+\end{learninggoals}
+
+\section{连续动力学的数学基础}
+\label{sec:discrete-to-continuous-dynamics}
+
+在前面的章节中，我们已经学习了深度学习的基本组成与计算过程。
+从模型训练的角度看，优化算法通过多次迭代不断调整模型参数；
+从模型结构的角度看，输入数据依次经过不同的网络模块，
+并逐步转化为更高层次的隐藏表示。
+这些训练和推理过程最终都由计算机执行，
+因此通常表现为有限个离散步骤上的状态更新。
+
+离散表示能够直接说明系统如何从当前状态到达下一状态，
+却不会显式描述两个离散步骤之间可能存在的演化过程。
+例如，当模型参数从
+\(\boldsymbol{\theta}_k\)
+更新为
+\(\boldsymbol{\theta}_{k+1}\)
+时，离散算法只记录更新前后的参数，
+并不直接刻画参数在这两个状态之间如何连续变化。
+类似地，网络前向传播通常只给出不同层上的隐藏表示，
+而不描述相邻层之间的中间状态。
+
+连续动力学提供了另一种描述方式。
+其基本思想是，将离散状态看作某条连续轨迹上的采样点，
+并使用状态的瞬时变化率描述轨迹在每个位置附近的局部演化。
+在这一视角下，研究对象不再只是彼此分离的状态序列，
+而是一条由局部变化不断累积形成的完整轨迹。
+
+需要强调的是，这种连续化并不意味着深度学习模型在计算机中
+真正以连续方式运行。模型的训练与推理仍由有限次离散运算完成。
+连续动力学的作用，是为这些离散计算建立一个理想化的连续描述：
+既可以从离散状态序列出发，研究其可能逼近的连续演化规律；
+也可以先定义连续动力系统，再通过数值方法将其转化为
+实际可执行的离散更新。因此，离散计算与连续动力学之间
+存在如下双向联系：
+\begin{equation}
+    \text{离散状态更新}
+    \;\xrightarrow{\;\text{连续化}\;}\;
+    \text{连续动力学}
+    \;\xrightarrow{\;\text{数值离散}\;}\;
+    \text{可执行的离散计算}.
+    \label{eq:discrete-continuous-discrete}
+\end{equation}
+
+本节首先以此前介绍过的梯度下降为例，
+说明离散参数更新如何与连续演化规律建立联系；
+随后介绍常微分方程中的状态、动力学、初始条件和轨迹等基本概念；
+最后讨论如何通过积分表示完整的状态演化，
+以及如何利用数值方法近似求解连续动力系统。
+
+\begin{importantnote}
+\textbf{新概念：}连续动力系统用状态的瞬时变化率描述演化规律。状态 \(\boldsymbol{x}(t)\) 表示系统在时刻 \(t\) 的位置，向量场 \(f(\boldsymbol{x},t)\) 给出该位置处的局部速度，初始条件决定从哪一点出发；三者共同确定一条随时间演化的轨迹。
+
+\textbf{重难点解析：}从梯度下降或网络层更新过渡到微分方程，是在步长趋小意义下建立的理想化连续描述，并非任意有限步长下的严格恒等。反过来，用 Euler、Runge--Kutta 等方法求解 ODE 时又会重新得到离散更新；步长、方法阶数与稳定域共同决定近似误差和数值稳定性。
+\end{importantnote}
+
+
+\subsection{从离散更新到连续演化}
+\label{subsec:discrete-to-continuous-evolution}
+
+在前面的章节中，我们已经介绍了梯度下降方法。
+设
+\(\boldsymbol{\theta}_k\in\mathbb{R}^{d}\)
+表示第 \(k\) 次迭代后的模型参数，
+\(L(\boldsymbol{\theta})\)
+表示训练损失，则梯度下降按照负梯度方向更新参数：
+\begin{equation}
+    \boldsymbol{\theta}_{k+1}
+    =
+    \boldsymbol{\theta}_k
+    -
+    \eta
+    \nabla_{\boldsymbol{\theta}}
+    L(\boldsymbol{\theta}_k),
+    \label{eq:gradient-descent}
+\end{equation}
+其中，\(\eta>0\) 为学习率，用于控制每次参数更新的幅度。
+
+式~\eqref{eq:gradient-descent} 描述的是相邻两次迭代之间的离散参数变化。
+为了从连续演化的角度观察这一过程，可以将学习率 \(\eta\)
+看作相邻两个训练时刻之间的间隔，并定义
+\begin{equation}
+    t_k=k\eta,
+    \qquad
+    t_{k+1}-t_k=\eta.
+    \label{eq:training-time}
+\end{equation}
+于是，梯度下降可以改写为
+\begin{equation}
+    \frac{
+        \boldsymbol{\theta}_{k+1}
+        -
+        \boldsymbol{\theta}_k
+    }{
+        t_{k+1}-t_k
+    }
+    =
+    -
+    \nabla_{\boldsymbol{\theta}}
+    L(\boldsymbol{\theta}_k).
+    \label{eq:gradient-descent-difference}
+\end{equation}
+式~\eqref{eq:gradient-descent-difference} 左侧表示模型参数在相邻两个训练时刻之间的
+平均变化率。
+
+如果将离散参数序列
+\(\{\boldsymbol{\theta}_k\}\)
+看作一条连续参数轨迹
+\(\boldsymbol{\theta}(t)\)
+在时刻 \(\{t_k\}\) 上的采样，并考虑学习率逐渐减小的情形，
+则上述平均变化率可以进一步过渡为参数关于训练时间的瞬时变化率：
+\begin{equation}
+    \frac{
+        \mathrm{d}\boldsymbol{\theta}(t)
+    }{
+        \mathrm{d}t
+    }
+    =
+    -
+    \nabla_{\boldsymbol{\theta}}
+    L\bigl(\boldsymbol{\theta}(t)\bigr).
+    \label{eq:gradient-flow-preview}
+\end{equation}
+
+由此，原本由有限步参数更新描述的训练过程，
+可以被理想化为一条随连续时间变化的参数轨迹。
+离散梯度下降直接给出相邻两次迭代之间的参数变化，
+而式~\eqref{eq:gradient-flow-preview}
+则通过参数的瞬时变化率描述其局部演化规律。
+
+这一例子表明，离散更新过程在适当条件下可以与连续状态演化建立联系。
+式~\eqref{eq:gradient-flow-preview}
+已经具有常微分方程的基本形式。
+为了进一步理解其中的状态变量、瞬时变化率、动力学函数以及完整演化轨迹，
+下一小节将正式介绍常微分方程的基本概念。
+
+
+
+\subsection{常微分方程}
+上一小节以梯度下降为例，将离散的参数更新序列理想化为一条连续参数轨迹
+\(\boldsymbol{\theta}(t)\)，并使用参数关于训练时间的瞬时变化率描述其局部演化。
+其中，梯度流
+\begin{equation}
+    \frac{\mathrm{d}\boldsymbol{\theta}(t)}{\mathrm{d}t}
+    =
+    -
+    \nabla_{\boldsymbol{\theta}}
+    L\bigl(\boldsymbol{\theta}(t)\bigr)
+\end{equation}
+规定了模型参数在任意时刻应当如何变化，是连续动力系统的一个具体例子。相较于只记录相邻两个离散状态，连续动力学更关注系统在任意时刻的局部变化规律。
+
+~\textbf{微分方程}正是描述这类连续变化的基本数学工具。
+它通过建立未知函数与其导数之间的关系，
+刻画系统状态如何随自变量发生变化。本节将首先介绍微分方程的基本概念，并重点讨论常微分方程（Ordinary Differential Equation，ODE）的相关技术；
+
+为了直观理解这些概念，先从最简单的匀速直线运动说起。设一个质点沿直线运动，令\(t \in \mathbb{R}\) 表示当前时刻， \(x(t)\) 表示质点在时刻 \(t\) 的位置。在这一表述中， \(t\) 是函数 \(x\)的自变量，\(x(t)\) 是位置函数在时刻 \(t\) 处的取值，也称为状态变量或因变量。 为了简化记号，在不会引起混淆时，可以使用 \(x\)来代替\(x(t)\)。
+
+对于沿直线运动的质点，速度刻画了位置随时间变化的快慢。用微积分的语言来说，速度就是位置函数 \(x(t)\) 对时间 \(t\) 的瞬时变化率，即
+\begin{equation}
+\frac{\mathrm{d}x(t)}{\mathrm{d}t}
+=
+\lim_{\Delta t \to 0}
+\frac{x(t+\Delta t)-x(t)}{\Delta t}.
+\end{equation}
+该式表示，当时间间隔 \(\Delta t\) 趋近于零时，平均速度的极限就是时刻 \(t\) 的瞬时速度。
+
+对于匀速直线运动而言，速度始终为常数\(v\)，因此我们得到：
+\begin{equation}
+\frac{\mathrm{d}x(t)}{\mathrm{d}t}
+=
+v.
+\label{eq:constant-velocity-ode}
+\end{equation}
+这就是一个最简单的\textbf{常微分方程}（ordinary differential equation，ODE），即未知函数\(x\) 只依赖单个自变量，即时间\(t\)。相反地，如果未知函数依赖多个自变量，例如同时依赖时间和空间，则相应方程称为\textbf{偏微分方程}（Partial differential equation，PDE）。
+
+更一般地，系统状态\(x(t)\) 的变化率未必是常数，而是也可能由当前状态和时间共同决定。此时可以用函数 \(f(\cdot)\) 表示这种变化的规律：
+\begin{equation}
+\frac{\mathrm{d}x(t)}{\mathrm{d}t}
+=
+f\bigl(x(t),t\bigr).
+\label{eq:ode-definition}
+\end{equation}
+这是一种更一般的常微分方程的形式。它刻画的不是状态 \(x(t)\) 在某一时刻的静态取值，而是状态随时间变化的瞬时规律；其中，\(f\bigl(x(t),t\bigr)\) 表示系统在状态 \(x(t)\) 和时刻 \(t\) 下的变化率。
+
+式~\eqref{eq:ode-definition} 也可以写成微分形式：
+\begin{equation}
+\mathrm{d}x(t)
+=
+f\bigl(x(t),t\bigr)\,\mathrm{d}t.
+\label{eq:ode-differential-form}
+\end{equation}
+这一写法直观地表示：在一个很小的时间间隔 \(\mathrm{d}t\) 内，状态变化量 \(\mathrm{d}x(t)\) 可以近似为当前变化率与时间增量的乘积。后续介绍数值积分方法和随机过程时，这种形式会更加方便。
+
+回到匀速直线运动，由于 \(f(x(t),t)=v\)，式~\eqref{eq:ode-definition} 退化为式~\eqref{eq:constant-velocity-ode}。对其两边积分可得
+\begin{equation}
+x(t)
+=
+vt+x(0),
+\label{eq:uniform-linear-motion}
+\end{equation}
+其中 \(x(0)\) 是 \(t=0\) 时的初始位置。因此，若初始位置\(x(0)\) 不同，即使速度 \(v\) 相同，也会得到不同的运动轨迹；从几何上看，该方程的解集是 \((t,x)\) 平面上一族斜率相同、截距不同的直线。这个简单的例子说明，微分方程的解通常需要结合初始条件才能唯一确定。
+
+当 \(f(\cdot)\) 显式依赖于位置 \(x(t)\) 时，系统展现出的变化规律会更加丰富。一个典型例子是线性回归过程：假设系统状态离平衡点越远，其回到平衡点的趋势越强。若这种变化率与当前状态成线性关系，即对于某个常数 \(k > 0\)，则有 \(f(x(t),t)=-kx(t)\)。这类方程被称为\textbf{线性常微分方程}。这类方程尤其值得关注，因为它们通常具有闭式解析解，即可以用显式的表达式直接写出系统状态随时间变化的规律，而不必完全依赖数值近似方法。 
+
+然而，在许多实际应用中，\(f(\cdot)\) 是非线性的。例如质点所处的实际环境导致运动规律包含 \(x(t)^2\) 或 \(\sin(x(t))\) 等非线性项，此时对应的方程便属于\textbf{非线性常微分方程}。与线性方程相比，非线性方程通常更难求得闭式解析解，即使解在理论上存在，也未必能够写成明确的公式形式。因此，在处理复杂系统时，往往需要借助数值方法对其进行近似求解。由于后续章节讨论的问题大多涉及非线性常微分方程，如何有效求得近似解将成为我们关注的重点。 
+
+需要注意的是，虽然 \(f(\cdot)\) 接收 \(x(t)\) 和 \(t\) 两个参数，但 \(x(t)\) 本身也是 \(t\) 的函数。因此，沿着任意一条给定的轨迹，速度都可以看作关于 \(t\) 的复合函数。在这种情况下，我们可以将 \(f(\cdot)\) 绘制为关于 \(t\) 的函数，其中任意时刻的函数值都对应于导数 \(\frac{\mathrm{d}x(t)}{\mathrm{d}t}\)。图~\ref{fig:curve-of-an-ode} 给出了一个简单的例子。
+
+然而在实际问题中，状态轨迹 \(x(t)\) 通常是未知的，因此函数 \(f(\cdot)\) 对时间 \(t\) 的具体依赖关系也往往难以直接确定。此外，\(f(\cdot)\) 对时间的显式依赖还会带来额外的复杂性；此时质点的运动规律并非固定不变，而是会随时间发生变化。为了强调这一点，我们可以采用记号 \(f_t(\cdot)\) 表示 \(f(\cdot,t)\)。这意味着，质点的速度不仅取决于其当前位置，也取决于当前时刻；即使质点在不同时间到达相同的位置，也可能具有不同的速度。
+
+图~\ref{fig:curve-of-an-ode} 分别展示了状态 \(x(t)\) 及其导数 \(\frac{\mathrm{d}x(t)}{\mathrm{d}t}\) 随时间的变化。虽然常微分方程中的函数 \(f(\cdot)\) 需要以 \(x(t)\) 作为输入，但 \(x(t)\) 本身由时间驱动。因此，当状态轨迹确定后，速度 \(f(x(t),t)\) 便可以隐式地看作仅关于时间 \(t\) 的函数。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-ode-example-curves}
+\caption{常微分方程因变量 ($x(t)$) 及其导数 ($\frac{d x(t)}{d t}$) 的曲线图。虽然该微分方程需要将 $x(t)$ 作为 $f(\cdot)$ 的输入，但 $x(t)$ 本身由时间驱动。因此，若轨迹固定，则速度 $f(\cdot)$ 隐式地成为仅关于 $t$ 的函数。故可直接绘制速度 $f(\cdot)$ 与 $t$ 的关系曲线。}
+\label{fig:curve-of-an-ode}
+\end{figure}
+
+从更根本的角度看，这类常微分方程定义了一个\textbf{动力系统}。在这一框架下，变量 \(x(t)\) 表示系统的\textbf{状态}，用于描述系统在某一特定时刻的整体情况；函数 \(f(\cdot)\) 则刻画系统的\textbf{动力学}，也常被称为\textbf{动力学规则}，用于说明系统状态在任意瞬间如何发生变化。
+
+从这一视角出发，函数是否显式依赖时间，实际上对应着对动力学规则本身的分类。如果动力学规则保持不变，并且只依赖于系统当前的状态，即 \(\frac{\mathrm{d}x(t)}{\mathrm{d}t}=f(x(t))\)，那么该系统称为\textbf{自治系统}；如果动力学规则本身会随时间变化，即 \(\frac{\mathrm{d}x(t)}{\mathrm{d}t}=f(x(t),t)\)，那么该系统称为\textbf{非自治系统}。
+
+非自治系统能够描述更加复杂的动态过程，但其分析和求解通常也比自治系统更加困难。例如，在第~\ref{sec:representation-dynamics} 节中，我们将说明一组堆叠的 Transformer 层可以从非自治动力系统的角度加以理解。
+
+\begin{table}[htbp]
+    \centering
+    \renewcommand{\arraystretch}{1.35}
+    \setlength{\tabcolsep}{8pt}
+    \begin{tabularx}{0.88\textwidth}{
+        >{\raggedleft\arraybackslash}p{0.27\textwidth}
+        |
+        >{\raggedright\arraybackslash}X
+    }
+        \toprule
+        \textbf{符号} & \textbf{含义} \\
+        \midrule
+
+        \(t\)
+        &
+        自变量，通常表示时间。
+        \\
+
+        \(x(t)\)
+        &
+        因变量，表示系统在时刻 \(t\) 的状态。
+        \\
+
+        \(\dfrac{\mathrm{d}x(t)}{\mathrm{d}t}\)
+        &
+        状态的导数，表示状态的瞬时变化率，例如速度。
+        \\
+
+        \(f(x(t),t)\)
+        &
+        控制系统演化的函数，也称为动力学规则，用于描述系统的动力学。
+        \\
+
+        \(\dfrac{\mathrm{d}x(t)}{\mathrm{d}t}
+        =f(x(t),t)\)
+        &
+        非自治常微分方程，其动力学显式依赖于时间。
+        \\
+
+        \(\dfrac{\mathrm{d}x(t)}{\mathrm{d}t}
+        =f(x(t))\)
+        &
+        自治常微分方程，其动力学仅依赖于系统状态，即动力学规则不随时间变化。
+        \\
+
+        \(\mathrm{d}x(t)
+        =f(x(t),t)\,\mathrm{d}t\)
+        &
+        常微分方程的微分形式，常用于数值积分和随机微积分。
+        \\
+
+        \(\dfrac{\mathrm{d}\boldsymbol{x}(t)}{\mathrm{d}t}
+        =f(\boldsymbol{x}(t),t)\)
+        &
+        向量值常微分方程，用于描述状态向量
+        \(\boldsymbol{x}(t)\in\mathbb{R}^{d}\)
+        所表示的多维系统，其中 \(f(\cdot)\) 定义了一个向量场。
+        \\
+
+        \bottomrule
+    \end{tabularx}
+    \caption{常微分方程中的基本概念}
+    \label{tab:basic-ode-concepts}
+\end{table}
+
+到目前为止，我们的讨论主要集中于标量变量和标量函数，即状态 \(x(t)\) 是一个标量变量，函数 \(f(\cdot)\) 是一个标量函数。一个自然的推广是在向量空间上定义常微分方程。令 \(\boldsymbol{x}(t)\in\mathbb{R}^{d}\) 表示一个包含 \(d\) 个不同分量的向量状态，例如神经网络某一层中的神经元激活值。相应地，函数 \(f(\cdot)\) 被定义为一个向量值映射 \(f:\mathbb{R}^{d}\times\mathbb{R}\rightarrow\mathbb{R}^{d}\)。此时，常微分方程可以写为
+\begin{equation}
+\frac{\mathrm{d}\boldsymbol{x}(t)}{\mathrm{d}t}
+=
+f\bigl(\boldsymbol{x}(t),t\bigr).
+\label{eq:vector-valued-ode}
+\end{equation}
+
+在式~\eqref{eq:vector-valued-ode} 中，导数 \(\frac{\mathrm{d}\boldsymbol{x}(t)}{\mathrm{d}t}\) 表示对向量 \(\boldsymbol{x}(t)\) 的各个分量分别求导。从标量状态推广到高维向量状态后，常微分方程具有了更加丰富的几何解释。在前面的例子中，标量函数只表示一条曲线的斜率；而向量函数 \(f(\cdot)\) 则在状态空间中定义了一个\textbf{向量场}。对于状态空间中的每一个点 \(\boldsymbol{x}(t)\)，向量 \(f(\boldsymbol{x}(t),t)\) 都给出了系统瞬时运动的大小和方向。
+
+图~\ref{fig:vector-field-examples} 给出了两个二维向量场的例子。每个箭头表示系统位于相应位置时的瞬时运动方向与大小；从不同初始状态出发并沿箭头方向连续推进，便得到由同一向量场诱导的不同状态轨迹。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-vector-field-examples}
+\caption{二维平面中向量场的两个示例。每个箭头表示状态位于该位置时的瞬时变化方向与大小；沿向量场积分可得到系统的状态轨迹。(a) 线性向量场产生圆形流线；(b) 非线性向量场产生更复杂的流线。}
+\label{fig:vector-field-examples}
+\end{figure}
+
+尽管我们将系统状态推广到了 \(d\) 维空间，常微分方程的基本概念和性质仍然成立。为了使本节的表述更加简洁，后续讨论仍将主要采用标量记号；而在之后的章节中，我们将主要使用向量值常微分方程来描述更加复杂的问题。表~\ref{tab:basic-ode-concepts} 总结了目前介绍的主要概念。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{常微分方程的求解：积分表示与数值方法}
+我们已经说明，常微分方程（ODE）刻画的是状态 $x(t)$ 的导数。一个自然的问题是：为什么我们要用导数来定义系统，而不是直接描述状态 $x(t)$ 本身？
+事实上，如果整个轨迹 $x(t)$ 都已知，那么ODE的描述是多余的，之所以要引入 ODE，是因为在许多实际应用中，我们无法得到 $x(t)$ 的解析表达式。我们通常只给定系统的动力学函数 $f(\cdot)$ 以及初始条件 $x(0)$。
+这类似于驾驶汽车：我们可以很容易知道当前时刻的速度，但要精确确定相对于起点的位置却很困难。在ODE中，速度对应 $f(\cdot)$，起点对应 $x(0)$，而我们的目标是重建整个轨迹 $x(t)$ 的“路径”。
+
+在这种情况下，我们需要求解常微分方程（ODE）。这通常被称为初值问题（initial value problem, IVP），其中给定一个ODE以及一个特定约束（例如初始状态 $x(0)$），我们希望从其导数恢复任意时刻 $t$ 的状态 $x(t)$。根据微积分基本定理，时刻 \(t\) 的状态可以看作初始状态 \(x(0)\) 加上从 \(0\) 到 \(t\) 这段时间内状态的总变化量。这个总变化量可以表示为导数（也就是速度）在区间 \([0,t]\) 上的积分，因此，我们可以通过积分写出ODE的解
+\begin{equation}
+\begin{aligned}
+x(t)
+&= x(0)+\int_0^t \frac{\mathrm{d}x(\tau)}{\mathrm{d}\tau}\,\mathrm{d}\tau \\
+&= x(0)+\int_0^t f(x(\tau),\tau)\,\mathrm{d}\tau .
+\end{aligned}
+\label{eq:ode-integral-solution}
+\end{equation}
+
+如图~\ref{fig:ode-solver-by-integration} 所示，该公式具有非常直观的几何解释。积分项 $\int_0^t f(x(\tau),\tau)d\tau$ 表示函数 $f(x(\tau),\tau)$ 在 $\tau=0$ 到 $\tau=t$ 区间上的带符号曲线下的面积。该面积量化了状态 $x(t)$ 在区间 $[0,t]$ 上的总累积变化。因此，该等式表明：时刻 $t$ 的状态可以通过将这一总变化（面积）加到初始状态 $x(0)$ 上得到。
+
+然而，这种积分形式在ODE求解中带来了计算上的挑战：尽管方程形式看起来很简单，但由于被积函数 $f(x(\tau),\tau)$ 依赖于未知的状态轨迹 $x(\tau)$ 本身，而获得状态轨迹又需要被积函数来积分，因此无法直接计算。此外，即使轨迹是显式给定的，由于动力系统（例如由深度神经网络建模）通常具有复杂性与非线性，解析计算该积分也往往十分困难。因此，我们必须转向数值方法来近似该积分。其核心思想是离散化：不再在每一个无穷小时间刻度上连续追踪 $x(t)$ 的演化，而是在一系列离散时间点 $\{t_0,t_1,\ldots,t_N\}$ 上对轨迹进行近似。由于在有限个点上计算函数 $f(\cdot)$ 的代价较低，因此离散化提供了一种高效获得近似解的方法。
+
+从黎曼积分的角度来看，离散化可以被理解为对~\eqref{eq:ode-integral-solution} 中的积分进行近似：将积分区间划分为若干小区间，并对由导数函数定义的矩形面积进行求和。图~\ref{fig:ode-discretization} 给出了示意图。为形式化该过程，我们在区间 $[0,t]$ 上定义时间网格，该网格包含 $N+1$ 个点 $t_0<t_1<\cdots<t_N$，其中 $t_0=0$ 为初始时刻，$t_N=t$ 为终止时刻。
+
+\begin{figure}[htbp]
+    \centering
+    \AMLFigure{figure-ode-solver-by-integration}
+    % 以下旧版内联 TikZ 仅作为历史备份保留，不参与编译。
+    \iffalse
+
+    %==================== 子图一：状态 ====================%
+    \begin{subfigure}{0.96\textwidth}
+        \centering
+        \begin{tikzpicture}[
+            x=0.9cm,
+            y=1.0cm,
+            >=Latex,
+            every node/.style={font=\small}
+        ]
+
+        % 背景
+        \fill[blue!4, rounded corners=8pt]
+        (-0.5,-1.6) rectangle (11.5,2.0);
+
+        % 坐标轴
+        \draw[->, thick, axisgray] (0,0) -- (11,0) node[right]{时间 \(t\)};
+        \draw[->, thick, axisgray] (0,-1.3) -- (0,1.6);
+
+        \node[anchor=east, text=axisgray] at (-0.2,1.3) {状态 \(x(t)\)};
+
+        % ===== 更平滑状态曲线 =====
+        \draw[stateblue, very thick, smooth]
+        plot coordinates {
+            (0,0.0)
+            (1,0.15)
+            (2,0.45)
+            (3,0.85)
+            (4,0.95)
+            (5,0.65)
+            (6,0.10)
+            (7,-0.55)
+            (8,-0.95)
+            (9,-0.55)
+            (10,0.35)
+            (11,0.85)
+        };
+
+        % 初值
+        \fill[markorange] (1,0.15) circle (2.5pt);
+        \node[above] at (1,0.15) {$x(0)$};
+
+        % 终点
+        \fill[markorange] (9,-0.55) circle (2.5pt);
+        \node[below] at (9,-0.55) {$x(t)$};
+
+        \node at (6,-1.3)
+        {(a) State $x(t)$};
+
+        \end{tikzpicture}
+    \end{subfigure}
+
+    \vspace{0.5cm}
+
+    %==================== 子图二：积分 ====================%
+    \begin{subfigure}{0.96\textwidth}
+        \centering
+        \begin{tikzpicture}[
+            x=0.9cm,
+            y=1.0cm,
+            >=Latex,
+            every node/.style={font=\small}
+        ]
+
+        % 背景
+        \fill[green!4, rounded corners=8pt]
+        (-0.5,-1.6) rectangle (11.5,2.0);
+
+        % 坐标轴
+        \draw[->, thick, axisgray] (0,0) -- (11,0) node[right]{时间 \(t\)};
+        \draw[->, thick, axisgray] (0,-1.3) -- (0,1.6);
+
+        \node[anchor=east, text=axisgray] at (-0.2,1.3) {$f(x(t),t)$};
+
+        % ===== 更平滑 dynamics =====
+        \draw[velocityteal, very thick, smooth]
+        plot coordinates {
+            (0,0.2)
+            (1,0.6)
+            (2,0.9)
+            (3,0.75)
+            (4,0.25)
+            (5,-0.45)
+            (6,-0.95)
+            (7,-0.65)
+            (8,0.05)
+            (9,0.75)
+            (10,0.95)
+            (11,0.55)
+        };
+
+        % ===== 更自然积分区域 =====
+        \fill[blue!25, opacity=0.5]
+        (2,0)
+        -- (2,0.6)
+        -- (3,0.75)
+        -- (4,0.25)
+        -- (5,-0.45)
+        -- (6,-0.95)
+        -- (7,-0.65)
+        -- (8,0.05)
+        -- (9,0.75)
+        -- (9,0)
+        -- cycle;
+
+        \node at (6,1.2)
+        {$\int_0^t f(x(\tau),\tau)d\tau$};
+
+        \node at (6,-1.3)
+        {(b) Dynamics and integral};
+
+        \end{tikzpicture}
+    \end{subfigure}
+
+    \fi
+    \caption{通过积分求解常微分方程的示意图。蓝色阴影表示动力学函数在区间上的积分，即相对于初始状态的累积变化；将该积分加到初始状态即可得到终止状态。}
+    \label{fig:ode-solver-by-integration}
+\end{figure}
+
+为简化表示，我们通常假设时间间隔为常数，即
+\begin{equation}
+\Delta t = t_{k+1}-t_k .
+\label{eq:time-step}
+\end{equation}
+其中 $\Delta t$ 被称为步长（step size）。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-discretizing-an-ODE}
+\caption{常微分方程离散化示意图。函数 \(f\) 给出状态在各时刻的瞬时变化率；蓝色圆点表示离散时间节点上的状态近似，矩形面积 \(\Delta t\cdot\Psi\) 近似一个时间步内的积分增量。}
+\label{fig:ode-discretization}
+\end{figure}
+
+我们的目标是计算一系列状态 $\{\bar{x}_0,\bar{x}_1,\ldots,\bar{x}_N\}$，其中每个 $\bar{x}_k$ 用于近似真实状态 $x(t_k)$。从当前状态 $\bar{x}_k$ 到下一状态 $\bar{x}_{k+1}$ 的转移，需要近似计算动力系统在小区间 $[t_k,t_{k+1}]$ 上的积分。数学上，该离散模型可以写为递推形式
+\begin{equation}
+\bar{x}_{k+1}
+=
+\bar{x}_k
++
+\operatorname{Approx}
+\left(
+\int_{t_k}^{t_{k+1}}
+f(x(\tau),\tau)\,\mathrm{d}\tau
+\right).
+\label{eq:numerical-integral-approx}
+\end{equation}
+
+其中函数 $\mathrm{Approx}(\cdot)$ 用于近似局部积分。在离散ODE模型中，该函数通常根据 $f(\cdot)$ 在局部几何结构上的取值来定义，例如
+\begin{equation}
+\operatorname{Approx}
+\left(
+\int_{t_k}^{t_{k+1}}
+f(x(\tau),\tau)\,\mathrm{d}\tau
+\right)
+=
+\Delta t \cdot
+\Psi\bigl(\bar{x}_k,t_k,\Delta t,f\bigr).
+\label{eq:approx-integral-psi}
+\end{equation}
+
+因此，式(10)可以改写为
+\begin{equation}
+\bar{x}_{k+1}
+=
+\bar{x}_k
++
+\Delta t \cdot
+\Psi\bigl(\bar{x}_k,t_k,\Delta t,f\bigr).
+\label{eq:general-ode-solver-update}
+\end{equation}
+
+其中 $\Psi(\cdot)$ 被称为增量函数（increment function）或阶跃函数（step function）。它利用在离散点上计算得到的 $f(\cdot)$ 来估计区间上的积分。不同的数值方法对应不同的 $\Psi(\cdot)$ 选择。例如，如果 $\Psi(\cdot)$ 取为左端点处的斜率 $f(\bar{x}_k,t_k)$，则得到经典的Euler方法（类似左黎曼和）。此时增量函数为动力学函数本身，即 $\Psi(\bar{x}_k,t_k,\Delta t,f)=f(\bar{x}_k,t_k)$。代入式(12)得到Euler方法的更新形式
+\begin{equation}
+\bar{x}_{k+1}
+=
+\bar{x}_k
++
+\Delta t \cdot
+f\bigl(\bar{x}_k,t_k\bigr).
+\label{eq:euler-method-update}
+\end{equation}
+
+由于每一步仅需一次函数计算，Euler方法计算效率较高。然而，当步长 $\Delta t$ 较大或动力系统变化较快时，其精度往往较差。为克服这一问题，数值ODE求解方法通常分为两类：高阶单步方法与多步方法。
+
+• 高阶单步方法。在数值分析中，方法的阶数描述误差随 $\Delta t\to 0$ 的收敛速度。如果局部误差为 $O(\Delta t^{p+1})$，则称该方法为$p$阶方法。高阶方法通过在区间 $[t_k,t_{k+1}]$ 内的多个点评估 $f(\cdot)$ 来更准确估计平均斜率。例如，四阶 Runge--Kutta 方法（RK4）并不只使用当前时刻的斜率来推进状态，而是在每个时间步内计算四个局部斜率：一个位于区间起点，两个用于估计区间中点，另一个用于估计区间终点。随后，RK4 对这四个斜率进行加权平均，并用该平均斜率来近似整个时间步内的状态变化。因此，相比显式欧拉法只使用起点斜率，RK4 能够更准确地刻画一个时间步内轨迹的弯曲变化，从而在不使用极小步长的情况下仍获得较高精度。
+
+• 多步方法。与单步方法不同，多步方法（如Euler和RK4）只依赖当前状态并丢弃历史信息，而多步方法利用轨迹历史信息，通过对过去导数值进行拟合（如多项式拟合）来预测下一步积分。例如Adams-Bashforth方法属于此类。其优点是计算效率高，可以复用已有函数评估结果；但缺点是非自启动，需要先用单步方法初始化前若干步。
+
+此外，还存在改进ODE求解器的其他方法，例如自适应步长方法。在该方法中，步长 $\Delta t$ 不再固定，而是根据局部误差动态调整。本文不对这些方法展开细节讨论，相关内容可参考数值分析教材。
+
+在进一步讨论之前，需要澄清本文所用记号。通常函数记号 $x(t)$ 表示连续时间状态，而在机器学习与随机过程领域中，$x_t$ 常用于表示时刻 $t$ 的状态。在数值求解中，$x_k$（或 $\bar{x}_k$）表示第$k$步的数值近似解。
+
+在前述讨论中，我们区分了数值近似解 $\bar{x}_k$ 与真实解析解 $x(t_k)$。但为了简化记号并与文献保持一致，后续我们用 $x_k$ 表示第$k$步的状态近似值，即
+\begin{equation}
+x_{k+1}
+=
+x_k
++
+\Delta t\,
+f\bigl(x_k,t_k\bigr).
+\label{eq:euler-method-simplified}
+\end{equation}
+
+有时也会使用 $x(t)$ 来表示对真实状态的近似。
+
+总结而言，给定由动力学 $f$ 和初始状态 $x(0)$ 定义的ODE系统，可以将ODE求解器视为一个函数 $\phi(\cdot)$。对于任意 $t\ge 0$，该函数返回状态的近似解，记为
+\begin{equation}
+x(t)
+=
+\phi\bigl(f,x(0),t\bigr).
+\label{eq:ode-solution-operator}
+\end{equation}
+同时满足初始条件 $x(0)=\phi(f,x(0),0)$。
+
+
+\paragraph{重新审视梯度下降}
+
+在本节开头，我们从梯度下降的离散参数更新出发，
+引出了连续时间下的梯度流方程。
+在介绍了常微分方程及其数值求解方法后，
+现在可以更准确地理解二者之间的关系。
+
+考虑梯度流
+\begin{equation}
+    \frac{\mathrm{d}\boldsymbol{\theta}(t)}
+    {\mathrm{d}t}
+    =
+    -
+    \nabla_{\boldsymbol{\theta}}
+    L\bigl(\boldsymbol{\theta}(t)\bigr).
+    \label{eq:gradient-flow-revisited}
+\end{equation}
+它是一般常微分方程\[
+    \frac{\mathrm{d}\boldsymbol{x}(t)}{\mathrm{d}t}
+    =
+    f\bigl(\boldsymbol{x}(t),t\bigr)
+\]在状态变量取为模型参数\(\boldsymbol{x}(t)=\boldsymbol{\theta}(t)\)，动力学函数取为负梯度
+\[
+    f\bigl(\boldsymbol{\theta}(t),t\bigr)
+    =
+    -
+    \nabla_{\boldsymbol{\theta}}
+    L\bigl(\boldsymbol{\theta}(t)\bigr)
+\]
+时的一个特殊情形。表~\ref{tab:gradient-flow-gradient-descent}
+总结了梯度流、欧拉法与梯度下降之间的对应关系。
+
+\begin{table}[htbp]
+    \centering
+    \caption{梯度流、显式欧拉法与梯度下降之间的对应关系}
+    \label{tab:gradient-flow-gradient-descent}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabular}{
+        >{\centering\arraybackslash}p{0.22\textwidth}
+        >{\centering\arraybackslash}p{0.30\textwidth}
+        >{\centering\arraybackslash}p{0.30\textwidth}
+    }
+        \toprule
+        \textbf{基本概念}
+        &
+        \textbf{一般 ODE 与欧拉法}
+        &
+        \textbf{梯度流与梯度下降}
+        \\
+        \midrule
+
+        系统状态
+        &
+        \(\boldsymbol{x}(t)\) 或 \(\boldsymbol{x}_k\)
+        &
+        模型参数
+        \(\boldsymbol{\theta}(t)\) 或 \(\boldsymbol{\theta}_k\)
+        \\
+
+        动力学函数
+        &
+        \(f\bigl(\boldsymbol{x}(t),t\bigr)\)
+        &
+        \(-\nabla_{\boldsymbol{\theta}}
+        L\bigl(\boldsymbol{\theta}(t)\bigr)\)
+        \\
+
+        连续动力学
+        &
+        \(\displaystyle
+        \frac{\mathrm{d}\boldsymbol{x}(t)}{\mathrm{d}t}
+        =
+        f\bigl(\boldsymbol{x}(t),t\bigr)\)
+        &
+        \(\displaystyle
+        \frac{\mathrm{d}\boldsymbol{\theta}(t)}{\mathrm{d}t}
+        =
+        -
+        \nabla_{\boldsymbol{\theta}}
+        L\bigl(\boldsymbol{\theta}(t)\bigr)\)
+        \\
+
+        离散步长
+        &
+        时间步长 \(\Delta t\)
+        &
+        学习率 \(\eta\)
+        \\
+
+        显式欧拉更新
+        &
+        \(\displaystyle
+        \boldsymbol{x}_{k+1}
+        =
+        \boldsymbol{x}_k
+        +
+        \Delta t\,
+        f(\boldsymbol{x}_k,t_k)\)
+        &
+        \(\displaystyle
+        \boldsymbol{\theta}_{k+1}
+        =
+        \boldsymbol{\theta}_k
+        -
+        \eta\,
+        \nabla_{\boldsymbol{\theta}}
+        L(\boldsymbol{\theta}_k)\)
+        \\
+
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+具体而言，对梯度流方程采用步长为
+\(\Delta t=\eta\)
+的显式欧拉法，可得
+\begin{align}
+    \boldsymbol{\theta}_{k+1}
+    &=
+    \boldsymbol{\theta}_k
+    +
+    \eta
+    \left[
+        -
+        \nabla_{\boldsymbol{\theta}}
+        L(\boldsymbol{\theta}_k)
+    \right]
+    \notag\\
+    &=
+    \boldsymbol{\theta}_k
+    -
+    \eta
+    \nabla_{\boldsymbol{\theta}}
+    L(\boldsymbol{\theta}_k),
+    \label{eq:gradient-descent-as-euler}
+\end{align}
+这正是梯度下降的更新公式。
+因此，从连续动力学的角度看，
+梯度流描述参数沿负梯度方向连续运动的理想化轨迹，
+而梯度下降则通过有限步长对这条连续轨迹进行离散近似；
+其中，学习率既控制每次参数更新的幅度，
+也对应数值求解中的时间步长。
+
+将梯度下降与常微分方程联系起来后，
+我们便可以借助动力系统和数值分析中的概念，
+进一步理解优化算法的训练行为。
+例如，梯度下降可以看作梯度流的显式欧拉离散，
+其中学习率对应数值求解的时间步长。
+当学习率过大时，离散更新可能无法准确跟随连续梯度流，
+从而出现损失振荡甚至训练发散。
+当损失函数在不同方向上的变化尺度相差很大时，
+这种现象还与常微分方程中的多时间尺度和刚性问题密切相关。
+
+这一连续动力学视角也可以自然地扩展到动量方法。
+考虑带动量的梯度下降
+\begin{align}
+    \boldsymbol{v}_{k+1}
+    &=
+    \mu\boldsymbol{v}_{k}
+    -
+    \eta
+    \nabla_{\boldsymbol{\theta}}
+    L(\boldsymbol{\theta}_{k}),
+    \label{eq:momentum-velocity}
+    \\
+    \boldsymbol{\theta}_{k+1}
+    &=
+    \boldsymbol{\theta}_{k}
+    +
+    \boldsymbol{v}_{k+1},
+    \label{eq:momentum-update}
+\end{align}
+其中，
+\(\boldsymbol{v}_{k}\)
+表示由过去更新逐步累积形成的动量，
+\(\mu\in[0,1)\)
+为动量系数。
+与普通梯度下降只根据当前位置的梯度更新不同，
+动量方法还保留了参数此前的运动趋势，
+因此可以减弱某些方向上的来回振荡，
+并在梯度方向较为一致时加快参数前进。
+
+在适当的时间缩放下，
+上述离散更新可以对应如下二阶常微分方程：
+\begin{equation}
+    \frac{\mathrm{d}^{2}\boldsymbol{\theta}(t)}
+    {\mathrm{d}t^{2}}
+    +
+    \gamma
+    \frac{\mathrm{d}\boldsymbol{\theta}(t)}
+    {\mathrm{d}t}
+    =
+    -
+    \nabla_{\boldsymbol{\theta}}
+    L\bigl(\boldsymbol{\theta}(t)\bigr),
+    \label{eq:heavy-ball-ode}
+\end{equation}
+其中，
+二阶导数描述参数运动的惯性，
+一阶导数项表示阻尼，
+损失函数的负梯度则提供驱动参数下降的作用力。
+因此，普通梯度下降可以理解为一阶梯度流，
+而带动量的优化方法则对应具有惯性和阻尼的二阶动力系统。
+这说明，常微分方程不仅提供了描述连续参数轨迹的工具，
+也为理解不同优化算法的结构与行为提供了统一视角。
+
+
+
+由此，本节开头提出的离散与连续之间的双向联系
+在梯度下降中得到了一个具体体现：
+离散梯度下降可以通过连续化得到梯度流，
+而梯度流又可以通过显式欧拉法重新离散为梯度下降。
+后续章节将沿用这一基本思想，
+从连续动力学及其数值离散的角度理解神经网络中的表示演化。
+
+\begin{exercisebox}
+  \begin{enumerate}
+    \item 说明离散状态更新、连续动力学和数值离散三者之间的关系。为什么从有限步长的梯度下降得到梯度流只能理解为理想化连续化？
+    \item 设 \(L(\theta)=\tfrac12 a\theta^2\)，其中 \(a>0\)。写出对应的梯度流，并用步长 \(\Delta t=\eta\) 作一次显式 Euler 离散。所得更新何时会因步长过大而不收敛到 \(0\)？
+    \item 对初值问题 \(\mathrm dx/\mathrm dt=-x,\ x(0)=2\)，分别写出解析解，并用步长 \(\Delta t=0.25\) 的显式 Euler 法计算 \(x(0.25)\) 和 \(x(0.5)\) 的近似值。
+    \item 比较显式 Euler 法、RK4 与自适应步长方法所利用的局部信息、计算代价和误差控制方式。为什么高阶方法不能简单理解为“多堆几层”？
+    \item 若梯度下降使用变化的学习率 \(\eta_k>0\)，请设计一组非均匀训练时刻 \(t_k\)，使离散更新仍能写成平均变化率等于负梯度的形式。
+  \end{enumerate}
+\end{exercisebox}
+
+
+
+\section{表示空间中的连续动力学}
+\label{sec:representation-dynamics}
+
+在深度学习中，输入经过网络变换后形成的中间特征称为\textbf{表示}
+（representation），所有可能表示构成的空间称为\textbf{表示空间}
+（representation space）。与训练过程中不断更新的模型参数不同，
+隐藏表示在模型参数固定后，随着网络前向传播而逐层变化。因此，
+深层网络的计算过程可以看作输入表示在表示空间中的一系列状态变换。
+
+在 Transformer 中，自注意力模块和前馈网络不断更新序列的隐藏表示。
+由于这些模块通常采用残差形式，其逐层更新与常微分方程数值求解中的
+离散状态推进具有相似结构。因此，可以将隐藏表示视为系统状态，
+将不同网络层视为表示演化过程中的离散计算步骤。
+这一视角不仅可以用于理解 Transformer 中表示的逐层变化，
+还可以借助高阶方法、隐式方法以及稳定性理论
+分析和设计不同的网络结构。
+
+常微分方程还可以进一步直接用于构造神经网络模块。
+与 Transformer 子层直接输出更新后的隐藏表示不同，
+神经常微分方程使用神经网络
+\(f_{\boldsymbol{\theta}}\)
+描述隐藏表示在当前状态下的瞬时变化率：
+\begin{equation}
+    \frac{\mathrm{d}\boldsymbol{H}(t)}
+    {\mathrm{d}t}
+    =
+    f_{\boldsymbol{\theta}}
+    \bigl(
+        \boldsymbol{H}(t),t
+    \bigr).
+    \label{eq:continuous-representation-dynamics}
+\end{equation}
+
+其中，神经网络接收当前隐藏表示
+\(\boldsymbol{H}(t)\)
+和时间 \(t\)，并输出其变化率。
+给定输入表示后，常微分方程求解器在指定时间区间内
+反复计算这一变化率，并通过数值积分得到最终的输出表示。
+因此，神经网络负责定义表示的局部演化规律，
+而常微分方程求解器负责将这些局部变化累积为完整的表示变换。
+这种模型称为神经常微分方程
+（Neural Ordinary Differential Equation，Neural ODE）。
+
+本节首先介绍 Transformer 的表示更新与常微分方程数值离散之间的联系，
+随后讨论常微分方程视角对网络结构设计、稳定性与刚性分析的启发，
+最后介绍神经常微分方程及其训练方法。
+
+\begin{importantnote}
+\textbf{新概念：}将层索引视为离散时间、将隐藏表示视为状态后，残差更新可以解释为表示轨迹的一次数值推进。Neural ODE 则直接用神经网络参数化瞬时变化率，并由 ODE 求解器在连续深度区间上累积这些局部变化。
+
+\textbf{重难点解析：}标准 Transformer 与显式 Euler 法具有“当前状态加局部增量”的结构对应，但其层间参数通常不共享，归一化、注意力和前馈子层也带来额外结构，因此不能据此断言它严格求解某个固定 ODE。只有明确连续模型、参数随深度的变化方式、步长和离散格式后，数值分析中的阶数与稳定性结论才可直接使用。
+\end{importantnote}
+
+\subsection{Transformer 的离散动力学解释}
+
+前一节已经说明，数值方法通过有限次状态推进来近似连续轨迹。
+将研究对象换成 Transformer 的隐藏表示后，自注意力模块和前馈网络
+所产生的残差更新也可以写成“当前状态加局部增量”的形式。
+这种结构上的对应使得 Transformer 的逐层计算可以从离散动力系统的角度理解，
+但并不意味着注意力机制本身就是微分方程，也不意味着 Transformer
+与某一种数值方法在所有意义下严格等价。下面将围绕状态、层索引和更新函数之间的对应关系，
+说明 ODE 数值离散如何为表示演化提供一种统一表述。
+
+\textbf{表示状态与残差更新。}
+设序列长度为 \(n\)，隐藏维数为 \(d\)，第 \(l\) 个残差子层输入的
+隐藏表示记为
+\(\boldsymbol{H}_{l}\in\mathbb{R}^{n\times d}\)。
+矩阵的每一行对应一个词元在当前深度处的上下文表示，而
+\(\boldsymbol{\theta}_{l}\) 表示该子层的模型参数。对于预归一化
+Transformer，一个自注意力子层或前馈网络子层都可以统一写成
+\begin{equation}
+    \boldsymbol{H}_{l+1}
+    =
+    \boldsymbol{H}_{l}
+    +
+    \alpha_l
+    F_l\!\left(
+        \operatorname{LN}(\boldsymbol{H}_{l});
+        \boldsymbol{\theta}_{l}
+    \right),
+    \label{eq:repr-residual-block}
+\end{equation}
+其中 \(F_l\) 表示子层变换，\(\operatorname{LN}\) 表示层归一化，
+\(\alpha_l>0\) 是残差分支的尺度，通常取
+\(\alpha_l=1\)。式~\eqref{eq:repr-residual-block} 中需要区分两类量：
+\(\boldsymbol{\theta}_{l}\) 属于参数空间，在训练过程中由优化算法更新；
+\(\boldsymbol{H}_{l}\) 属于表示空间，在给定参数后随一次前向传播逐层变化。
+这里研究的动力学是后一种变化，而不是参数优化轨迹。
+
+为了建立连续描述，取一组深度网格
+\[
+    t_0<t_1<\cdots<t_L,
+    \qquad
+    h_l=t_{l+1}-t_l,
+\]
+并考虑表示空间上的非自治动力系统
+\begin{equation}
+    \frac{\mathrm{d}\boldsymbol{H}(t)}{\mathrm{d}t}
+    =
+    f\!\left(
+        \boldsymbol{H}(t),t;
+        \boldsymbol{\theta}(t)
+    \right).
+    \label{eq:repr-transformer-vector-field}
+\end{equation}
+对式~\eqref{eq:repr-transformer-vector-field} 在
+\([t_l,t_{l+1}]\) 上作一次显式 Euler 离散化，可得
+\begin{equation}
+    \boldsymbol{H}(t_{l+1})
+    \approx
+    \boldsymbol{H}(t_l)
+    +
+    h_l
+    f\!\left(
+        \boldsymbol{H}(t_l),t_l;
+        \boldsymbol{\theta}(t_l)
+    \right).
+    \label{eq:repr-euler-correspondence}
+\end{equation}
+若令
+\(\boldsymbol{H}_{l}\leftrightarrow\boldsymbol{H}(t_l)\)、
+\(\alpha_l\leftrightarrow h_l\)，并把
+\(F_l\circ\operatorname{LN}\) 看作局部向量场的一次离散实现，
+则式~\eqref{eq:repr-residual-block} 与
+式~\eqref{eq:repr-euler-correspondence} 具有相同的
+“当前状态加步长乘局部变化率”结构。各个量的对应关系如下表所示：
+\begin{center}
+\begin{tabular}{lll}
+    \toprule
+    Transformer 中的量 & 连续动力系统中的量 & 作用 \\
+    \midrule
+    子层索引 \(l\) & 网格时刻 \(t_l\) & 标记推进位置 \\
+    隐藏表示 \(\boldsymbol{H}_l\) & 状态 \(\boldsymbol{H}(t_l)\) & 描述当前表示 \\
+    子层变换 \(F_l\) & 向量场 \(f\) & 给出局部更新方向 \\
+    残差尺度 \(\alpha_l\) & 步长 \(h_l\) & 控制单步更新幅度 \\
+    参数 \(\boldsymbol{\theta}_l\) & \(\boldsymbol{\theta}(t_l)\) & 参数化局部动力学 \\
+    \bottomrule
+\end{tabular}
+\end{center}
+
+这一对应首先是一种\textbf{结构解释}。标准 Transformer 的
+\(F_l\) 可以随层改变，层归一化、注意力掩码和其他离散操作也未必来自某个
+预先给定的光滑向量场；同时，单位残差尺度并不一定是逼近连续轨迹所需的“小步长”。
+因此，不能由式~\eqref{eq:repr-euler-correspondence} 推出
+Transformer 严格等于某个 ODE 的 Euler 求解结果。更准确地说，
+ODE 视角为不同层的状态推进提供了共同的数学语言，并允许用截断误差、
+稳定域和步长等概念考察这种推进。
+
+\textbf{一个完整 Transformer 层的分裂形式。}
+若以 \(\mathcal{A}_l\) 和 \(\mathcal{B}_l\) 分别表示吸收了层归一化的
+自注意力变换和前馈网络变换，则完整一层可写为
+\begin{align}
+    \widetilde{\boldsymbol{H}}_l
+    &=
+    \boldsymbol{H}_l
+    +
+    h_l\,
+    \mathcal{A}_l(
+        \boldsymbol{H}_l;
+        \boldsymbol{\theta}^{\mathrm{att}}_l
+    ),
+    \nonumber\\
+    \boldsymbol{H}_{l+1}
+    &=
+    \widetilde{\boldsymbol{H}}_l
+    +
+    h_l\,
+    \mathcal{B}_l(
+        \widetilde{\boldsymbol{H}}_l;
+        \boldsymbol{\theta}^{\mathrm{ffn}}_l
+    ).
+    \label{eq:repr-transformer-split-update}
+\end{align}
+自注意力在词元维度聚合上下文信息，前馈网络则对各位置的表示施加非线性变换；
+二者直接产生隐藏表示的增量。若连续动力学被形式化为
+\[
+    \frac{\mathrm{d}\boldsymbol{H}}{\mathrm{d}t}
+    =
+    \mathcal{A}(\boldsymbol{H},t)
+    +
+    \mathcal{B}(\boldsymbol{H},t),
+\]
+那么式~\eqref{eq:repr-transformer-split-update} 可理解为先推进
+\(\mathcal{A}\) 所描述的动力学，再从中间状态推进
+\(\mathcal{B}\) 所描述的动力学。这种顺序执行类似于一阶算子分裂，
+也说明两个子层的排列次序会影响最终表示。图~\ref{fig:transformer-sublayer-as-ode-solver}
+概括了 Transformer 子层更新与 ODE 数值推进之间的结构对应。
+
+\begin{figure}[htbp]
+    \centering
+    \AMLFigure{figure-transformer-sublayer-as-ode-solver}
+    \caption{Transformer 的离散表示更新与连续动力系统状态推进之间的结构对应。}
+    \label{fig:transformer-sublayer-as-ode-solver}
+\end{figure}
+
+由此，Transformer 的一次前向传播可以被看作表示状态沿网络深度经历的一串
+离散推进。这个解释的价值不在于把已有网络重新命名为 ODE，而在于为下一步
+提出更具体的问题：若一种残差结构类似于一阶显式推进，那么改变积分格式，
+是否会产生具有不同精度、计算量和稳定性质的网络模块？
+
+\subsection{数值积分视角下的网络结构设计}
+
+离散动力学的解释不仅用于重述已有结构，还提供了比较和设计网络模块的数值分析语言。
+标准残差更新主要利用当前表示给出一次局部推进，而高阶方法会在一个更新区间内
+综合多个局部变化率或中间表示；隐式方法则让待求的下一状态参与更新方程，
+因而需要预测--校正、定点迭代或其他方程求解过程。
+本小节将由这一差异出发，讨论数值积分格式如何启发多阶段、历史复用和隐式求解式的网络结构，
+而不是简单地把“高阶”理解为增加网络层数。
+
+\textbf{算子分裂与子层排列。}
+把注意力和前馈网络看作两个同时作用于表示的向量场，
+\[
+    \frac{\mathrm{d}\boldsymbol{H}}{\mathrm{d}t}
+    =
+    \mathcal{A}(\boldsymbol{H})
+    +
+    \mathcal{B}(\boldsymbol{H}),
+\]
+则标准的串行子层可对应于 Lie--Trotter 型分裂：
+在一个步长内先近似求解 \(\mathcal{A}\)，再近似求解
+\(\mathcal{B}\)。这种分裂通常只有一阶精度，而且不具备交换对称性；
+交换两个子层的顺序一般会改变输出。若希望获得对称的二阶组合，可采用
+“半步前馈--整步注意力--半步前馈”的 Strang 型结构。若
+\(\Phi_h^{\mathcal{A}}\) 与 \(\Phi_h^{\mathcal{B}}\)
+分别表示两个子动力学推进时间 \(h\) 的流映射，则
+\begin{equation}
+    \boldsymbol{H}_{l+1}
+    =
+    \Phi_{h_l/2}^{\mathcal{B}}
+    \circ
+    \Phi_{h_l}^{\mathcal{A}}
+    \circ
+    \Phi_{h_l/2}^{\mathcal{B}}
+    (\boldsymbol{H}_l).
+    \label{eq:repr-strang-block}
+\end{equation}
+在经典数值分析中，式~\eqref{eq:repr-strang-block} 要具有二阶精度，需要满足一定条件。首先，前后两个半步对应的必须是同一个子动力学算子，并且每个子流映射都需要被足够准确地求解。对于显式依赖时间的非自治系统，还需要对时间变量采用与分裂格式一致的处理方式。如果仅使用普通残差子层去近似每个流映射 \(\Phi\)，或者在两次前馈变换中采用完全独立的参数，那么得到的网络模块虽然仍然具有类似“B-A-B”的三明治结构，但并不能自动继承 Strang 分裂方法的二阶误差性质。换言之，数值积分格式提供的是一种网络设计思路，而具体模型是否保留相应的理论性质，还取决于算子的参数共享方式、子模块求解精度以及实际实现方式。
+
+\textbf{多阶段高阶更新。}数值方法的“阶”描述误差随步长缩小时的收敛速度。
+对足够光滑的问题和稳定的单步格式，
+局部截断误差为 \(O(h_l^{p+1})\) 时，
+在固定积分区间上的全局误差通常为 \(O(h_l^p)\)，
+相应方法称为 \(p\) 阶方法；多步格式还需要相应的零稳定性条件。
+这里的 \(p\) 并不表示网络堆叠了 \(p\) 倍的外部层数。
+高阶单步方法通常在同一个更新区间内评估多个中间斜率。
+例如，可用二阶 Heun 格式构造两阶段模块：
+\begin{align}
+    \boldsymbol{K}_1
+    &=
+    F\!\left(
+        \boldsymbol{H}_{l},t_l;
+        \boldsymbol{\theta}_{l}
+    \right),
+    \nonumber\\
+    \boldsymbol{K}_2
+    &=
+    F\!\left(
+        \boldsymbol{H}_{l}+h_l\boldsymbol{K}_1,
+        t_l+h_l;
+        \boldsymbol{\theta}_{l}
+    \right),
+    \nonumber\\
+    \boldsymbol{H}_{l+1}
+    &=
+    \boldsymbol{H}_{l}
+    +
+    \frac{h_l}{2}
+    \left(
+        \boldsymbol{K}_1+\boldsymbol{K}_2
+    \right).
+    \label{eq:repr-rk2-block}
+\end{align}
+\(\boldsymbol{K}_1\) 是起点处的变化率，
+\(\boldsymbol{K}_2\) 在预测的终点处重新评估变化率，二者的平均值近似区间上的
+平均斜率。若两次评估共享 \(\boldsymbol{\theta}_l\)，模块的参数量不必随阶段数
+成比例增加，但函数评估次数和计算量仍会增加。更高阶 Runge--Kutta 格式遵循
+同一思想：在一个宏观更新内组合多个中间状态，而不是把“高阶”简单等同于“更深”。
+此外，阶段数与误差阶只是低阶格式中常见的对应，二者在一般情形下并不相同。
+
+图~\ref{fig:transformer-rk-blocks} 将基线预归一化子层与两阶段、四阶段更新并列展示。该对照强调，高阶格式所增加的是一个宏观更新内部的函数评估阶段，而不是简单增加外部网络深度。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-transformer-rk-blocks}
+\caption{基于数值 ODE 求解器启发的 Transformer 子层架构对比。(a) 基线预归一化结构对应一阶显式 Euler 型更新；(b) 与 (c) 分别展示受 RK2 和 RK4 启发的多阶段更新。中间状态与局部变化率在同一宏观更新区间内被组合。}
+\label{fig:transformer-rk-blocks}
+\end{figure}
+
+\textbf{历史复用与多步更新。}
+高阶近似也可以利用已经计算过的历史变化率。例如，在等步长 \(h\) 下，二步
+Adams--Bashforth 型更新为
+\begin{equation}
+    \boldsymbol{H}_{l+1}
+    =
+    \boldsymbol{H}_{l}
+    +
+    h
+    \left[
+        \frac{3}{2}
+        F_l(\boldsymbol{H}_{l})
+        -
+        \frac{1}{2}
+        F_{l-1}(\boldsymbol{H}_{l-1})
+    \right].
+    \label{eq:repr-ab2-block}
+\end{equation}
+它复用前一层已经得到的局部更新，可在较少新增函数评估的情况下利用轨迹历史；
+代价是需要保存历史表示或历史变化率，而且网络的首个更新必须由单步格式启动。
+式~\eqref{eq:repr-ab2-block} 具有经典二阶精度的前提是，
+\(F_{l-1}\) 与 \(F_l\) 是同一个足够光滑的非自治向量场
+在相邻网格时刻的函数值，并且网格等步长、启动值也达到所需精度。
+若各层参数彼此独立，使 \(F_l\) 只是一组任意变化的层函数，
+该更新仍可作为历史复用结构，但不再自动具有 Adams--Bashforth 的二阶保证。
+从架构角度看，跨层聚合、稠密连接或显式缓存旧层更新都可与这种多步思想建立联系，
+但只有在系数和状态对应关系明确时，才能讨论其数值阶。
+
+\textbf{隐式更新与内部求解。}
+显式格式由当前状态直接计算下一状态；隐式 Euler 格式则定义
+\begin{equation}
+    \boldsymbol{H}_{l+1}
+    =
+    \boldsymbol{H}_{l}
+    +
+    h_l
+    F\!\left(
+        \boldsymbol{H}_{l+1},t_{l+1};
+        \boldsymbol{\theta}_{l}
+    \right).
+    \label{eq:repr-implicit-euler-block}
+\end{equation}
+未知的 \(\boldsymbol{H}_{l+1}\) 同时出现在等式两侧，
+所以式~\eqref{eq:repr-implicit-euler-block} 不是一次普通前向计算。
+一种基本实现是先用显式步给出预测值，再作定点迭代：
+\begin{align}
+    \boldsymbol{H}_{l+1}^{(0)}
+    &=
+    \boldsymbol{H}_{l}
+    +
+    h_l
+    F(\boldsymbol{H}_{l},t_l;\boldsymbol{\theta}_{l}),
+    \nonumber\\
+    \boldsymbol{H}_{l+1}^{(r+1)}
+    &=
+    \boldsymbol{H}_{l}
+    +
+    h_l
+    F\!\left(
+        \boldsymbol{H}_{l+1}^{(r)},t_{l+1};
+        \boldsymbol{\theta}_{l}
+    \right).
+    \label{eq:repr-fixed-point-block}
+\end{align}
+当 \(F\) 对状态的 Lipschitz 常数为 \(L_F\) 且
+\(h_lL_F<1\) 时，上述映射在相应区域内为压缩映射，定点迭代具有基本的
+收敛保证。实际网络也可采用有限次校正、拟牛顿法或学习到的求解器近似隐式解。
+因此，“隐式”指下一状态由隐式方程定义，而不是指隐藏层不可见；其主要代价是
+内部迭代和停止准则带来的额外计算。
+
+\begin{center}
+\begin{tabularx}{\linewidth}{>{\bfseries}lXXX}
+    \toprule
+    格式 & 使用的信息 & 主要潜力 & 主要代价 \\
+    \midrule
+    显式单步
+      & 当前表示处的一次变化率
+      & 结构简单、可并入普通残差块
+      & 精度和稳定域受步长限制 \\
+    多阶段高阶
+      & 同一区间内的多个中间变化率
+      & 提高局部近似阶，参数可在阶段间共享
+      & 增加函数评估次数 \\
+    多步
+      & 当前及若干历史变化率
+      & 复用历史计算
+      & 需要启动方法和跨层缓存 \\
+    隐式
+      & 包含未知下一状态的变化率
+      & 往往具有更大的稳定域
+      & 需要求根或迭代校正 \\
+    \bottomrule
+\end{tabularx}
+\end{center}
+
+
+\subsection{表示动力学的稳定性与刚性}
+
+尽管常微分方程为模型设计提供了理论解释，但在将相关概念应用于深度神经网络时，底层动力系统的稳定性仍然是一个挑战。从常微分方程的角度来看，Transformer 的稳定性与信息流的平滑性以及常微分方程的刚性密切相关。
+
+将 Transformer 建模为常微分方程的一个问题是，学习到的动力学可能是刚性的。\textbf{刚性}指的是隐藏状态连续动力学以极不相同的速率演化的现象，例如，某些分量变化迅速，而其他分量变化缓慢。因此，刚性常微分方程是指标准显式数值方法严重不稳定的常微分方程，需要非常小的步长才能稳定地求解该方程。在神经网络的背景下，这意味着标准显式求解器（或固定深度的残差连接）可能无法有效地传播信号，因为在尝试捕捉这些快速的瞬态变化时，若没有足够精细的离散化，它们容易产生数值不稳定性。经典数值分析文献指出，标准欧拉法或龙格-库塔法等显式方法的稳定区域有限。当应用于刚性问题时，它们通常需要很小的步长以避免数值发散。相比之下，隐式方法通常更适用于刚性问题，因为它们具有更大的稳定区域。
+
+对于 Transformer 而言，由于层的离散性，这个问题更为严重。在这些模型中，参数 $\theta$ 是独立的，并且在不同层之间可能存在巨大差异。这与稳定求解常微分方程所需的平滑动力学假设相矛盾。回顾常微分方程公式 $\frac{d\mathbf{x}(t)}{dt} = F(\mathbf{x}(t),\theta(t))$，其中 $\theta(t)$ 表示随时间 $t$ 连续变化的参数。然而，在标准 Transformer 中，每层的参数是固定的，从而将 $\theta(t)$ 离散化为一个阶梯函数（即 $\theta_1, \theta_2, \dots$）。这些参数的突变导致系统动力学从一层到下一层发生急剧变化。例如，在大语言模型中，经常观察到前几层的参数值明显不同，导致不同层之间的中间表示存在显著差异。图~\ref{fig:dynamics-caused-by-changes-in-parameters} 展示了此问题的示意图。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-system-dynamics-shift-vs-parameter-change}
+\caption{系统动力学因参数突变而发生变化的示意图。蓝线表示系统动力学
+$f(\mathbf{x}(t),\theta(t))$ 的演化，红线表示参数 $\theta(t)$ 的演化。
+子图 (a) 展示参数和动力学连续平滑变化的理想情况；
+子图 (b) 展示标准 Transformer 中离散层参数导致动力学发生阶跃变化的情况。}
+\label{fig:dynamics-caused-by-changes-in-parameters}
+\end{figure}
+
+为了缓解由刚性和参数突变引起的数值不稳定性，很自然地会约束函数 $F$ 的变异性。实现此目标的一种常见方法是通过 Lipschitz 连续性条件。具体来说，为确保常微分方程良态且能稳定求解，必须存在一个常数 $K$ 使得 $\|F(\mathbf{H}_1) - F(\mathbf{H}_2)\| \le K \|\mathbf{H}_1 - \mathbf{H}_2\|$。在神经网络中，Lipschitz 常数与每层权重矩阵的谱范数（即矩阵的最大奇异值）密切相关。约束谱范数可以有效地限制 Lipschitz 常数。这种约束不仅平滑了动力学，还确保了信号通过网络深度的放大受到控制。这有助于防止数值发散。
+
+更广泛地，我们可以使用显式正则化技术来实现更高的稳定性。可以考虑两种常见策略：
+
+\textbf{参数正则化}。为了强制 Transformer 中动力学随深度的演化更平滑，可以在损失函数中引入一个惩罚项。以下方程展示了一个惩罚项的例子
+\begin{eqnarray}
+\mathcal{L}_{\text{param}} & = & \lambda_{\text{param}} \sum_{k=1}^{L-1} || \theta_{k+1} - \theta_{k} ||_2^2,
+\end{eqnarray}
+\noindent 其中 $\lambda_{\text{param}}$ 是惩罚项的权重，$L$ 是 Transformer 层堆叠的深度\footnote{此处，一个 Transformer 层包含两个子层。$\theta_k$ 表示整个层的所有参数集合。}。此项约束相邻层具有相似的参数。在极限情况下（例如，当 $\lambda_{\text{param}} \to \infty$ 时），此约束强制 $\theta_{k+1} \approx \theta_k$，这导致了参数共享架构。在此类模型中，$\theta$ 在各层间变为常数，非自治常微分方程转化为一个自治系统。这实际上将深度维度视为循环神经网络的时间步长。一般而言，自治系统更稳定且参数效率更高。
+
+\textbf{状态正则化}。此方法直接控制层间输出的变化。例如，我们可以惩罚相邻层输出之间的较大差异，如下所示
+\begin{eqnarray}
+\mathcal{L}_{\text{state}} & = & \lambda_{\text{state}} \sum_{k=1}^{L-1} || \mathbf{H}_{k+1} - \mathbf{H}_{k} ||_2^2,
+\end{eqnarray}
+
+其中 $\lambda_{\text{state}}$ 是该正则化项的权重。从这个意义上说，像层归一化这样的归一化方法可以被视为在 Transformer 中正则化隐藏状态的一种有效方式。另一种方法涉及将先前层的输出作为输入来产生组合输出。此类层组合技术已广泛用于训练深度神经网络。从数值分析的角度来看，这些架构可以解释为多步数值积分器（例如，线性多步方法），其中下一状态的近似依赖于先前状态的历史，而不仅仅是紧邻的前一个状态。这种序列依赖有效地平滑了隐藏状态 $\mathbf{H}(t)$ 的轨迹。通过聚合来自多个先前步骤的信息，即使离散变换变化迅速，信号的传播也能相对稳健。
+
+\subsection{从离散深度到神经常微分方程}
+
+常微分方程视角为理解和设计深度网络提供了一种连续动力学框架。
+在传统深度网络中，表示变换通常被描述为有限层网络的逐层计算过程：
+每一层根据当前状态产生新的表示，多个离散变换组合形成最终输出。
+从动力系统角度看，这一过程可以理解为表示状态在高维空间中的逐步演化，
+网络层对应离散时间步，而每层计算则决定状态在该步中的变化方向。
+
+基于这一思想，ODE不仅可以作为一种工具用于解释已有网络结构，
+还可以进一步用于重新设计网络的计算范式。前者关注的是：
+如何将离散层网络理解为连续动力系统的近似；
+后者则关注：
+如何直接利用连续动力系统定义网络的表示演化过程。
+
+神经常微分方程（Neural Ordinary Differential Equation,
+Neural ODE）正是在这一背景下提出的连续深度模型。与固定层数的神经网络不同，
+Neural ODE不再显式规定一系列离散状态更新，而是通过学习表示空间中的连续动力规律，
+由神经网络定义状态在任意时刻的瞬时变化率：
+
+\begin{equation}
+\frac{dH(t)}{dt}
+=
+f_\theta(H(t),t),
+\qquad
+H(t_0)=H_0 .
+\end{equation}
+
+其中，$H(t)$表示连续深度变量下的隐藏状态，
+$f_\theta$表示由神经网络参数化的动力场（vector field）。
+需要强调的是，$f_\theta$并不是直接完成一次完整的表示变换，
+而是描述当前状态在演化过程中的瞬时变化方向，真正的状态变化轨迹由ODE求解器积分得到。
+
+因此，Neural ODE改变的是网络描述计算过程的方式：
+传统深度网络显式定义有限数量的状态转移，
+而Neural ODE学习的是连接这些状态的连续演化规律。
+换言之，网络不再直接回答“下一层表示是什么”，
+而是学习“当前表示应以何种速度和方向演化”。
+
+\begin{table}[htbp]
+\centering
+\caption{固定深度网络与Neural ODE模块的比较}
+\begin{tabular}{p{3cm}p{5cm}p{5cm}}
+\hline
+比较维度 & 固定深度残差网络 & Neural ODE模块 \\
+\hline
+
+状态更新 &
+由预先排列的离散网络层直接完成 &
+由连续向量场定义，并通过ODE求解器积分得到 \\
+
+基本对象 &
+离散状态转移
+$H_l\rightarrow H_{l+1}$ &
+连续轨迹
+$H(t)$的演化过程 \\
+
+参数形式 &
+通常每一层具有独立参数$\theta_l$ &
+通常共享动力学参数$\theta$，并可显式依赖时间$t$ \\
+
+计算步数 &
+网络结构设计时固定 &
+由求解器误差容差和轨迹复杂度动态决定 \\
+
+中间状态 &
+对应固定层输出 &
+对应ODE求解过程中的内部时间节点 \\
+
+误差控制 &
+由网络结构和参数训练间接影响 &
+可通过积分步长和误差容差显式控制 \\
+
+\hline
+\end{tabular}
+\end{table}
+
+
+
+从数学上看，Neural ODE的状态转移满足积分形式：
+
+\begin{equation}
+H(t_1)
+=
+H(t_0)
++
+\int_{t_0}^{t_1}
+f_\theta(H(\tau),\tau)d\tau .
+\end{equation}
+
+由于$f_\theta$通常具有复杂的非线性结构，且积分路径$H(\tau)$未知，
+上述积分一般无法通过解析方法求解，而是需要通过数值常微分方程求解器（如欧拉法、龙
+格-库塔法或更先进的方法）计算得到：
+
+\begin{equation}
+H(t_1)
+=
+\mathrm{ODESolve}
+(f_\theta,H(t_0),[t_0,t_1]).
+\end{equation}
+
+其中，神经网络负责计算当前状态下的变化率，而ODE求解器负责不断调用该
+变化率，并通过数值积分获得最终状态。
+
+固定步长求解器预先规定各次状态推进的时间间隔，而自适应求解器会依据局部误差估计动态调整步长。图~\ref{fig:fixed-step-size-vs-adaptive-step-size} 展示了两类求解策略在同一连续轨迹上的取点差异。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-fixed-step-size-vs-adaptive-step-size}
+\caption{固定步长与自适应步长求解常微分方程的示意图。(a) 固定步长方法在整个区间采用相同的时间步长；(b) 自适应步长方法根据局部轨迹复杂度与误差估计动态选择时间步长。}
+\label{fig:fixed-step-size-vs-adaptive-step-size}
+\end{figure}
+
+神经常微分方程的训练可视为标准深度神经网络训练任务，通过计算损失函数对参数 $\theta$ 的梯度来迭代更新参数。直接方法是沿求解器运算过程执行标准反向传播，但这往往因需要存储整个轨迹的中间状态以应用链式法则而产生高昂内存开销。内存瓶颈可能限制精细求解器或长时积分的使用。为此，神经常微分方程通常采用\textbf{伴随灵敏度方法}进行训练，该方法能以与积分步数无关的恒定内存成本计算梯度。我们将在第 \ref{sec:neuralode-training} 节详细讨论训练细节。
+
+简而言之，神经常微分方程使用神经网络 $f(\cdot)$ 来近似系统动力学 $\frac{d \mathbf{H}(t)}{d t}$。在训练阶段，我们优化该网络以建模这些动力学行为；在测试阶段，则可通过求解神经常微分方程直接恢复系统在任意时刻的状态。
+
+\subsection{神经常微分方程的训练与伴随灵敏度法}
+\label{sec:neuralode-training}
+伴随灵敏度方法（或称伴随方法）是源自最优控制领域的一种经典技术，用于计算由微分方程支配的系统的灵敏度。在深度学习中，它可以被解释为连续时间的反向传播。其核心思想是引入一组辅助变量，称为\textbf{伴随状态}，用于追踪损失的梯度如何随时间反向演化。它通过求解第二个微分方程来计算模型参数的梯度，而不是将链式法则显式地应用于前向传播的离散操作。
+
+在将其与标准反向传播进行比较时，应强调这一区别。在一个朴素的实现（通常称为“先离散化再优化”）中，人们会将数值 ODE 求解器视为具有有限层数的计算图，并直接通过求解器的内部操作进行反向传播。然而，由于 ODE 求解器可能需要数千个小步骤才能达到高精度，标准反向传播需要存储每个步骤的中间激活值。这导致内存使用量随积分步数线性增长（$O(T)$），达到难以承受的程度。换句话说，使用大量步长进行 ODE 求解的离散化使得训练内存密集，有时甚至不可行。
+
+形式上，我们将伴随状态 $\mathbf{a}(t)$ 定义为损失函数 $\mathcal{L}$ 相对于任意给定时间 $t$ 的隐藏状态 $\mathbf{x}(t)$ 的梯度
+\begin{eqnarray}
+\mathbf{a}(t) & = & \frac{\partial \mathcal{L}}{\partial \mathbf{x}(t)}.
+\end{eqnarray}
+直观上，$\mathbf{a}(t)$ 表示最终损失对时间 $t$ 时状态微小扰动的敏感性。由于损失是基于最终状态 $\mathbf{x}(t_1)$ 计算的，因此伴随状态的边界条件是已知的
+\begin{eqnarray}
+\mathbf{a}(t_1) & = & \frac{\partial \mathcal{L}}{\partial \mathbf{x}(t_1)}.
+\end{eqnarray}
+
+需要注意的是，虽然 $\mathbf{x}(t)$ 是从 $t_0$ 到 $t_1$ 正向求解的，但伴随状态 $\mathbf{a}(t)$ 必须使用 $\mathbf{a}(t_1)$ 作为反向积分的初始值，从 $t_1$ 到 $t_0$ 反向求解。图 \ref{fig:adjoint-sensitivity-method} 展示了该方法的高层示意图。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-adjoint-sensitivity-method}
+\caption{神经常微分方程中伴随灵敏度方法的示意图
+}
+\label{fig:adjoint-sensitivity-method}
+\end{figure}
+\subsubsection{伴随动力学}
+
+我们不通过求解器的步骤进行反向传播，而是通过求解一个新的常微分方程来计算 $\mathbf{a}(t)$。为了理解 $\mathbf{a}(t)$ 的动力学，考虑使用步长为 $\Delta t$ 的简单欧拉方法对前向传播进行离散化。从 $t$ 到 $t+\Delta t$ 的状态更新为
+\begin{eqnarray}
+\mathbf{x}(t+\Delta t) & = & \mathbf{x}(t) + \Delta t \cdot f(\mathbf{x}(t), \theta, t). \label{eq:euler-method-for-adjoint-dynamics}
+\end{eqnarray}
+
+应用链式法则，损失关于隐藏状态 $\mathbf{x}(t)$ 的梯度可以表示为
+\begin{eqnarray}
+\mathbf{a}(t) & = & \frac{\partial \mathcal{L}}{\partial \mathbf{x}(t)} \nonumber \\
+& = & \left( \frac{\partial \mathbf{x}(t+\Delta t)}{\partial \mathbf{x}(t)} \right)^\top \frac{\partial \mathcal{L}}{\partial \mathbf{x}(t+\Delta t)} \nonumber \\
+& = & \left( \frac{\partial \mathbf{x}(t+\Delta t)}{\partial \mathbf{x}(t)} \right)^\top \mathbf{a}(t+\Delta t), \label{eq:adjoint-gradient-step1}
+\end{eqnarray}
+
+\noindent 其中 $\frac{\partial \mathbf{x}(t+\Delta t)}{\partial \mathbf{x}(t)} \in \mathbb{R}^{d \times d}$ 是雅可比矩阵，而 $\mathbf{a}(t), \mathbf{a}(t+\Delta t) \in \mathbb{R}^{d}$ 是列向量。
+
+将方程 (\ref{eq:euler-method-for-adjoint-dynamics}) 代入方程 (\ref{eq:adjoint-gradient-step1}) 得到
+\begin{eqnarray}
+\mathbf{a}(t) & = & \left( \frac{\partial \big( \mathbf{x}(t) + \Delta t \cdot f(\mathbf{x}(t), \theta, t) \big)}{\partial \mathbf{x}(t)} \right)^\top \mathbf{a}(t+\Delta t) \nonumber \\
+& = & \left( \frac{\partial \mathbf{x}(t) + \partial \Delta t \cdot f(\mathbf{x}(t), \theta, t) }{\partial \mathbf{x}(t)} \right)^\top \mathbf{a}(t+\Delta t) \nonumber \\
+& = &  \left( \mathbf{I} + \Delta t \cdot \frac{\partial f(\mathbf{x}(t), \theta, t)}{\partial \mathbf{x}(t)} \right)^\top \mathbf{a}(t+\Delta t).
+\end{eqnarray}
+
+重新整理此方程，得到伴随状态的差商
+\begin{eqnarray}
+\frac{\mathbf{a}(t+\Delta t) - \mathbf{a}(t)}{\Delta t} & = & - \left( \frac{\partial f(\mathbf{x}(t), \theta, t)}{\partial \mathbf{x}(t)} \right)^\top \mathbf{a}(t+\Delta t).
+\end{eqnarray}
+
+通过取极限 $\Delta t \to 0$，我们得到伴随状态的连续时间动力学。这导出了描述 $\mathbf{a}(t)$ 瞬时变化率的微分方程
+\begin{eqnarray}
+\frac{d \mathbf{a}(t)}{d t} & = & - \left( \frac{\partial f(\mathbf{x}(t), \theta, t)}{\partial \mathbf{x}(t)} \right)^\top \mathbf{a}(t) . \label{eq:adjoint_dynamics}
+\end{eqnarray}
+这里，$\frac{\partial f}{\partial \mathbf{x}}$ 是动力学函数的雅可比矩阵。这个方程告诉我们，伴随状态由一个线性常微分方程定义，该方程依赖于原始函数 $f(\cdot)$ 的雅可比矩阵。
+
+类似地，我们可以推导出参数 $\theta$ 的梯度。在每个时间步 $t$，参数 $\theta$ 对状态变化做出微小贡献，进而影响损失。时间 $t$ 处的瞬时梯度贡献是损失对状态的敏感度 ($\mathbf{a}(t)$) 乘以状态变化对参数的敏感度 ($\frac{\partial f}{\partial \theta}$)。总梯度是这些瞬时贡献在整个轨迹上的累积（积分）
+\begin{eqnarray}
+\frac{\partial \mathcal{L}}{\partial \theta} & = & - \int_{t_1}^{t_0} \left( \frac{\partial f(\mathbf{x}(t), \theta, t)}{\partial \theta} \right)^\top \mathbf{a}(t) dt. \label{eq:param_gradient}
+\end{eqnarray}
+注意，积分是从 $t_1$ 到 $t_0$ 反向进行的，这与反向传播的反向过程一致。
+\subsubsection{增广常微分方程与内存效率}
+
+式 (\ref{eq:adjoint_dynamics}) 和 (\ref{eq:param_gradient}) 给出了精确的梯度，但它们依赖于所有时刻 $t$ 的状态轨迹 $\mathbf{x}(t)$。在标准的反向传播中，这需要存储前向传播中的所有中间状态 $\mathbf{x}(t)$，导致 $O(T)$ 的内存开销。
+
+伴随灵敏度方法的关键优势在于通过反向时间重建状态轨迹来避免这种存储。由于描述状态演化的常微分方程是确定性的且通常是可逆的，我们可以通过反向运行动力学从最终状态 $\mathbf{x}(t_1)$ 恢复 $\mathbf{x}(t)$\footnote{常微分方程在简单的函数意义上并非天生可逆，但这一概念适用于机器学习中的神经常微分方程和流（即随时间变化的解）。非正式地说，可逆性意味着逆转变换以找到先前的状态或在空间之间映射。}。
+
+为了高效地计算梯度，我们构建一个包含原始状态、伴随状态和累积参数梯度的\textbf{增广状态}
+\begin{eqnarray}
+\mathbf{s}(t) & = & \begin{bmatrix} \mathbf{x}(t) \\ \mathbf{a}(t) \\ \frac{\partial \mathcal{L}}{\partial \theta}(t) \end{bmatrix},
+\end{eqnarray}
+
+\noindent 其中 $\frac{\partial \mathcal{L}}{\partial \theta}(t)$ 是从 $t_1$ 到 $t$ 的反向积分，即 $\frac{\partial \mathcal{L}}{\partial \theta}(t) = - \int_{t_1}^{t} \left( \frac{\partial f(\mathbf{x}(\tau), \theta, \tau)}{\partial \theta} \right)^\top \mathbf{a}(\tau) d\tau$。这个组合系统的动力学从 $t_1$ 到 $t_0$ 联合反向求解：
+\begin{eqnarray}
+\frac{d \mathbf{s}(t)}{dt} & = & \begin{bmatrix} f(\mathbf{x}(t), \theta, t) \\ - \left( \frac{\partial f}{\partial \mathbf{x}(t)} \right)^\top \mathbf{a}(t) \\ - \left( \frac{\partial f}{\partial \theta} \right)^\top \mathbf{a}(t) \end{bmatrix},
+\end{eqnarray}
+
+\noindent 初始条件为
+\begin{eqnarray}
+\mathbf{s}(t_1) & = & \begin{bmatrix} \mathbf{x}(t_1) \\ \frac{\partial \mathcal{L}}{\partial \mathbf{x}(t_1)} \\ \mathbf{0} \end{bmatrix}.
+\end{eqnarray}
+
+增广动力学的第一个分量就是原始的常微分方程。这意味着当求解器反向积分时，它会即时重建轨迹 $\mathbf{x}(t)$。在任何特定时间 $t$，评估雅可比矩阵（在第二和第三分量中）所需的 $\mathbf{x}(t)$ 值在当前增广状态 $\mathbf{s}(t)$ 中即可获得。因此，我们不需要存储前向传播的中间状态，内存复杂度从 $O(T)$ 降低到 $O(1)$。本质上，伴随方法以重新求解状态轨迹的计算开销为代价，换取了内存的节省。需要注意的是，这个增广常微分方程可以使用现成的数值求解器来求解。人们也可以根据特定需求，通过简单地调整容差参数来平衡计算效率和数值精度。
+
+总而言之，神经常微分方程的训练过程可以概括为以下两个步骤：
+
+\begin{enumerate}
+    \item \textbf{前向传播：} 从 $t_0$ 到 $t_1$ 求解常微分方程以得到 $\mathbf{x}(t_1)$，并计算损失 $\mathcal{L}$。
+    \item \textbf{反向传播：} 在 $t_1$ 处构造增广状态的初始值：$\mathbf{s}(t_1) = [\mathbf{x}(t_1), \frac{\partial \mathcal{L}}{\partial \mathbf{x}(t_1)}, \mathbf{0}]^\top$。使用常微分方程求解器从 $t_1$ 到 $t_0$ 反向积分增广动力学方程 $\frac{d \mathbf{s}(t)}{dt} = [f(\mathbf{x}(t), \theta, t),$ $- \left( \frac{\partial f}{\partial \mathbf{x}(t)} \right)^\top \mathbf{a}(t), - \left( \frac{\partial f}{\partial \theta} \right)^\top \mathbf{a}(t)]^\top$。
+\end{enumerate}
+
+\begin{exercisebox}
+  \begin{enumerate}
+    \item 对残差更新 \(\boldsymbol H_{l+1}=\boldsymbol H_l+\alpha_lF_l(\boldsymbol H_l)\)，指出隐藏表示、层索引、残差尺度和子层变换分别对应显式 Euler 更新中的哪些量。
+    \item 设二阶 Heun 型模块满足 \(K_1=F(H_l)\)、\(K_2=F(H_l+hK_1)\)、\(H_{l+1}=H_l+\tfrac h2(K_1+K_2)\)。当 \(F(H)=H\)、\(H_l=1\)、\(h=0.2\) 时，计算一次更新结果。
+    \item 什么是表示动力学中的刚性？请从参数平滑、状态平滑或隐式更新中选择两种策略，说明它们如何改善稳定性。
+    \item 比较固定深度残差网络与 Neural ODE 在参数形式、计算步数、中间状态和误差控制方面的差异。若轨迹在某段时间内弯曲剧烈，自适应求解器应如何调整步长？
+    \item 写出伴随状态的终端条件和反向动力学，并说明伴随灵敏度法为何能够降低内存占用，以及它为此付出的计算或数值代价。
+  \end{enumerate}
+\end{exercisebox}
+
+
+
+\section{确定性概率动力学}
+
+上一节主要讨论了连续动力系统在表示学习中的作用，即如何描述单个隐藏状态
+随连续深度变量演化形成一条确定性的轨迹。在这一视角下，研究对象是给定初始
+状态后的表示变换过程，即关注“一个状态如何随动力系统运动”。
+
+然而，生成模型关注的问题有所不同。生成模型的目标并非仅仅变换某一个确定的
+样本，而是学习数据背后的概率分布，并建立不同分布之间的转换关系。例如，在
+生成任务中，模型需要学习如何将简单的随机分布逐渐转化为复杂的数据分布。
+因此，连续动力系统的研究对象需要从单个状态进一步推广到由大量样本共同构成
+的概率分布。
+
+当同一个确定性动力系统作用于不同初始样本时，每个样本都会沿自身轨迹演化，
+而所有样本轨迹的整体运动将诱导概率分布随时间发生连续变化。因此，连续生成
+模型需要从“一个状态如何运动”进一步转向“概率质量如何随动力系统重新分布”。
+
+这一转变涉及两个相互关联的问题：一方面，需要建立样本轨迹与概率分布演化
+之间的数学联系，即利用流映射和连续性方程描述分布输运过程；另一方面，需要
+设计可学习的动力学机制，从数据中恢复这种分布变化规律。
+
+本节主要介绍包括连续归一化流（Continuous Normalizing
+Flow, CNF）和 流匹配（Flow Matching，FM）等基于确定性连续动力系统的生成方法。前者通过同时追踪样本轨迹与概率密度变化，
+构建可逆的连续生成模型；后者则通过预先构造概率路径，直接学习产生该路径的
+连续动力学。二者均采用确定性的样本输运过程，但在路径构造方式和训练目标上
+存在差异。
+
+本节将首先从单个样本轨迹推广到概率分布的连续输运，建立流映射与质量守恒
+之间的关系；随后介绍连续归一化流与 Flow Matching 的基本思想，并讨论概率
+路径选择对轨迹几何性质和数值求解难度的影响。
+
+\begin{importantnote}
+\textbf{新概念：}确定性 ODE 不仅把单个初始样本映射为一条轨迹，还会把整族初始样本共同推向新的分布。流映射描述样本位置如何变化，推前分布描述概率质量被搬运到哪里，连续性方程则以局部守恒形式刻画密度随时间的演化。
+
+\textbf{重难点解析：}CNF 通过散度积分追踪沿轨迹的对数密度变化，适合显式似然建模；Flow Matching 预先构造概率路径，并以向量场回归学习产生该路径的速度。二者都在生成时积分 ODE，但监督信号和训练时是否需要求解完整轨迹并不相同；还应始终核对数据到先验与先验到数据的时间方向。
+\end{importantnote}
+
+\subsection{从样本轨迹到概率输运}
+
+常微分方程从一个初始状态出发可以确定一条轨迹，
+但仅研究单条轨迹无法说明一组随机样本的统计结构如何变化。
+为此，需要同时考虑来自初始分布的所有样本，并考察它们在同一动力学作用下
+被推向哪些位置。由样本级状态演化诱导出的分布级变化就是概率输运，
+它把前文的状态动力学扩展为生成建模所需的分布动力学。
+
+给定状态空间中的一个初始样本 $x(0)\in\mathbb{R}^d$，
+以及一个随时间变化的向量场
+$f:\mathbb{R}^d\times[0,T]\rightarrow\mathbb{R}^d$，
+该样本按照如下常微分方程演化：
+
+\begin{equation}
+\frac{dx(t)}{dt}=f(x(t),t),
+\qquad
+x(0)=x_0 .
+\end{equation}
+
+这里的“确定性”是指：当初始状态 $x_0$ 和向量场 $f$ 给定后，
+轨迹不再包含额外的随机扰动，而是由动力系统唯一决定。
+不同的初始状态会产生不同的演化轨迹；如果考虑大量初始样本，
+这些轨迹的整体运动将进一步诱导样本分布随时间发生变化。
+
+将初始状态推进到时刻 $t$ 的映射记为流映射
+$\Phi_{0\rightarrow t}$，即：
+
+\begin{equation}
+x(t)
+=
+\Phi_{0\rightarrow t}(x(0))
+=
+x(0)+
+\int_0^t f(x(s),s)\,ds .
+\end{equation}
+
+于是，分布 $p_t$ 不是独立指定的，而是由初始分布 $p_0$ 和流映射共同诱导。
+这一关系称为\textbf{推前（pushforward）}：
+
+\begin{equation}
+    p_t
+    =
+    \bigl(\Phi_{0\to t}\bigr)_{\#}p_0.
+    \label{eq:det-pushforward}
+\end{equation}
+
+严格地说，对任意可测集合 $A\subseteq\mathbb{R}^{d}$，有：
+
+\begin{equation}
+    \mathbb{P}\bigl(x(t)\in A\bigr)
+    =
+    \mathbb{P}\bigl(
+        x(0)\in\Phi_{0\to t}^{-1}(A)
+    \bigr).
+    \label{eq:det-pushforward-set}
+\end{equation}
+
+等价地，对任意适当的测试函数 $\varphi$，
+
+\begin{equation}
+    \mathbb{E}_{x(t)\sim p_t}
+    \bigl[\varphi(x(t))\bigr]
+    =
+    \mathbb{E}_{x(0)\sim p_0}
+    \left[
+        \varphi\bigl(\Phi_{0\to t}(x(0))\bigr)
+    \right].
+    \label{eq:det-pushforward-test}
+\end{equation}
+
+式~\eqref{eq:det-pushforward-test}揭示了样本视角与分布视角之间的对应关系：
+左侧关心时刻 $t$ 下分布 $p_t$ 的统计量，右侧则通过将初始样本
+$x(0)$ 经过流映射推进后计算相同的统计量。因此，在有限训练样本条件下，
+也可以将经验分布中的每个样本沿上述ODE推进，并利用推进后的样本集合近似
+演化后的分布 $p_t$。
+
+本节统一采用：
+
+\[
+    p_0=p_{\mathrm{data}},
+    \qquad
+    p_T=p_{\mathrm{prior}}
+\]
+
+的时间方向：前向输运过程将数据分布逐渐转化为易于处理的先验分布，
+而生成过程则从 $p_T$ 中采样，并沿同一流映射的逆方向回到 $t=0$。
+如果流映射可逆，则有：
+
+\begin{equation}
+    p_0
+    =
+    \bigl(\Phi_{T\to 0}\bigr)_{\#}p_T,
+    \qquad
+    \Phi_{T\to 0}
+    =
+    \Phi_{0\to T}^{-1}.
+    \label{eq:det-generative-pushforward}
+\end{equation}
+
+这一约定同时区分了两个层面：
+式中的ODE描述单个样本的位置变化，而推前关系
+\eqref{eq:det-pushforward}描述所有样本轨迹共同诱导的概率质量变化，
+如图~\ref{fig:pushforward} 所示。
+
+\begin{figure}[htbp]
+    \centering
+    \AMLFigure{figure-pushforward}
+    \caption{同一向量场作用于所有初始样本时，样本轨迹的集合诱导出概率分布的推前。}
+    \label{fig:pushforward}
+\end{figure}
+
+推前关系给出了概率输运的整体定义，但尚未说明
+$\Phi_{0\to t}$在什么条件下可逆，也没有给出密度
+$p_t(\mathbf{x})$在局部如何变化。下一小节将分别通过流映射的性质和连续性方程
+回答这两个问题。
+
+\subsection{流映射与连续性方程}
+
+描述概率输运既要知道每个初始点在给定时刻到达何处，
+也要保证运动过程中概率质量既不凭空产生也不消失。
+流映射汇总了向量场在一段时间内对所有初始状态的累积作用，
+连续性方程则从局部角度刻画密度变化与概率通量之间的平衡。
+二者分别连接样本轨迹和分布守恒，为后续计算密度随流的变化奠定基础。
+
+为了同时描述任意起止时刻，引入两参数流映射
+\begin{equation}
+    \Phi_{s\to t}(\mathbf{x}_s)
+    =
+    \mathbf{x}_s
+    +
+    \int_s^t
+    f\bigl(\mathbf{x}(\tau),\tau\bigr)\,\mathrm{d}\tau,
+    \qquad
+    \mathbf{x}(s)=\mathbf{x}_s.
+    \label{eq:det-two-time-flow}
+\end{equation}
+在解唯一存在的时间区间内，它满足恒等关系和复合关系
+\begin{equation}
+    \Phi_{s\to s}=\operatorname{Id},
+    \qquad
+    \Phi_{r\to t}
+    =
+    \Phi_{s\to t}\circ\Phi_{r\to s},
+    \quad r\leq s\leq t.
+    \label{eq:det-flow-composition}
+\end{equation}
+式~\eqref{eq:det-flow-composition} 表明，先从 \(r\) 推进到 \(s\)，
+再从 \(s\) 推进到 \(t\)，与直接从 \(r\) 推进到 \(t\) 得到同一状态。
+对于显式依赖时间的非自治向量场，应使用这种带起止时刻的记号；
+只有在动力学不显式依赖时间时，才可以进一步把它写成常见的单参数流形式。
+
+若 \(f(\mathbf{x},t)\) 关于 \(\mathbf{x}\) 局部 Lipschitz，
+并且解在所讨论的时间区间内存在，则初值问题的解具有唯一性。
+唯一性排除了两条不同轨迹在同一时刻相交后再分开的情形，
+并给出
+\begin{equation}
+    \Phi_{s\to t}^{-1}
+    =
+    \Phi_{t\to s}.
+    \label{eq:det-flow-inverse}
+\end{equation}
+若向量场对状态还具有足够的连续可微性，
+流映射及其逆映射也连续可微，此时
+\(\Phi_{s\to t}\) 是一个微分同胚。
+这一光滑可逆性使得变量替换、雅可比矩阵和密度演化公式都有明确含义。
+需要注意，理论上的可逆流不等同于数值计算中的逐位可逆：
+有限步长和舍入误差仍可能使正向求解后再反向求解无法完全恢复初值。
+
+流映射描述“点到哪里”，连续性方程则描述“概率质量怎样通过某处”。
+设 \(S_s\) 是时刻 \(s\) 的一个区域，
+并令 \(S_t=\Phi_{s\to t}(S_s)\) 随流一起运动。
+由于确定性输运只移动概率质量而不创造或消灭概率质量，
+\begin{equation}
+    \int_{S_t}p_t(\mathbf{x})\,\mathrm{d}\mathbf{x}
+    =
+    \int_{S_s}p_s(\mathbf{x})\,\mathrm{d}\mathbf{x}.
+    \label{eq:det-mass-conservation}
+\end{equation}
+对任意随流区域都要求式~\eqref{eq:det-mass-conservation} 成立，
+可得到密度的\textbf{连续性方程}
+\begin{equation}
+    \frac{\partial p_t(\mathbf{x})}{\partial t}
+    +
+    \nabla_{\mathbf{x}}\cdot
+    \left(
+        p_t(\mathbf{x})f(\mathbf{x},t)
+    \right)
+    =
+    0.
+    \label{eq:det-continuity}
+\end{equation}
+其中，
+\(p_t(\mathbf{x})f(\mathbf{x},t)\)
+称为概率通量。若某一小区域的净流出为正，
+该区域中的概率密度就会下降；若净流入为正，密度则会上升。
+将散度项展开，可写成
+\begin{equation}
+    \frac{\partial p_t}{\partial t}
+    +
+    f^\top\nabla_{\mathbf{x}}p_t
+    +
+    p_t\nabla_{\mathbf{x}}\cdot f
+    =
+    0.
+    \label{eq:det-continuity-expanded}
+\end{equation}
+前两项合在一起正是沿样本轨迹观察到的密度全导数。
+因此，在 \(p_t(\mathbf{x}(t))>0\) 处，
+\begin{equation}
+    \frac{\mathrm{d}}{\mathrm{d}t}
+    \log p_t\bigl(\mathbf{x}(t)\bigr)
+    =
+    -
+    \nabla_{\mathbf{x}}\cdot
+    f\bigl(\mathbf{x}(t),t\bigr).
+    \label{eq:det-lagrangian-density}
+\end{equation}
+如果散度为正，邻近轨迹形成的局部体积膨胀，密度沿轨迹降低；
+如果散度为负，局部体积收缩，密度升高；散度为零则表示局部体积保持。
+
+从有限时间的角度看，令
+\[
+    J_{s\to t}(\mathbf{x}_s)
+    =
+    \frac{\partial\Phi_{s\to t}(\mathbf{x}_s)}
+    {\partial\mathbf{x}_s}
+\]
+为流映射的雅可比矩阵。多元变量替换公式给出
+\begin{equation}
+    p_t\bigl(\Phi_{s\to t}(\mathbf{x}_s)\bigr)
+    =
+    p_s(\mathbf{x}_s)
+    \left|
+        \det J_{s\to t}(\mathbf{x}_s)
+    \right|^{-1}.
+    \label{eq:det-finite-density-change}
+\end{equation}
+式~\eqref{eq:det-finite-density-change} 记录一段时间内的累积体积变化，
+而式~\eqref{eq:det-lagrangian-density} 记录其瞬时变化率。
+二者是同一质量守恒原理的有限时间形式和微分形式。
+连续归一化流正是利用后一种形式，避免直接计算整个流映射的
+高维雅可比行列式。
+
+\subsection{连续归一化流}
+流映射描述了单个样本在向量场作用下的位置变化，而连续归一化流
+（continuous normalizing flow, CNF）进一步关注整个概率分布如何随流演化。
+其核心思想是：利用一个连续可逆动力系统，将复杂的数据分布连续变换为简单
+的先验分布，同时保持概率质量守恒。
+
+直观地看，这类似于将一团染料释放到流动的水中。虽然水流会使染料云发生
+拉伸、压缩和变形，但染料总质量保持不变。CNF正是利用这种连续变形机制，
+建立简单分布与复杂数据分布之间的可逆映射。
+
+设状态空间中的样本满足神经常微分方程
+
+\begin{eqnarray}
+\frac{d\mathbf{x}(t)}{dt}
+&=&
+f_{\theta}(\mathbf{x}(t),t),
+\label{eq:cnf-ode}
+\end{eqnarray}
+
+其中 $f_{\theta}$ 是由神经网络参数化的向量场。
+与普通 Neural ODE 只关注状态轨迹不同，CNF 还需要追踪轨迹对应的概率密度
+变化。
+
+考虑初始时刻 $t=0$ 的任意区域 $\mathcal{S}_0$。在流映射
+$\Phi_t(\cdot)$ 作用下，该区域演化为
+
+\begin{eqnarray}
+\mathcal{S}_t=\Phi_t(\mathcal{S}_0).
+\end{eqnarray}
+
+由于概率质量既不会产生也不会消失，区域内概率保持不变：
+
+\begin{eqnarray}
+\int_{\mathcal{S}_t}p_t(\mathbf{x})d\mathbf{x}
+=
+\int_{\mathcal{S}_0}p_0(\mathbf{z})d\mathbf{z}.
+\end{eqnarray}
+
+令
+
+\[
+\mathbf{x}=\Phi_t(\mathbf{z}),
+\]
+
+根据多元变量替换公式，有
+
+\begin{eqnarray}
+\int_{\mathcal{S}_0}
+p_t(\Phi_t(\mathbf{z}))
+\left|
+\det
+\frac{\partial\Phi_t(\mathbf{z})}{\partial\mathbf{z}}
+\right|
+d\mathbf{z}
+=
+\int_{\mathcal{S}_0}
+p_0(\mathbf{z})d\mathbf{z}.
+\end{eqnarray}
+
+由于该关系对于任意区域 $\mathcal{S}_0$ 成立，因此得到密度的逐点变换关系：
+
+\begin{eqnarray}
+p_t(\mathbf{x}(t))
+\left|
+\det
+\frac{\partial\mathbf{x}(t)}
+{\partial\mathbf{x}(0)}
+\right|
+=
+p_0(\mathbf{x}(0)).
+\end{eqnarray}
+
+进一步整理得到连续流中的变量替换公式：
+
+\begin{eqnarray}
+p_t(\mathbf{x}(t))
+=
+p_0(\mathbf{x}(0))
+\left|
+\det
+\frac{\partial\mathbf{x}(t)}
+{\partial\mathbf{x}(0)}
+\right|^{-1}.
+\label{eq:cnf-change-variable}
+\end{eqnarray}
+
+其中雅可比行列式表示流映射造成的局部体积变化。
+如果流使空间发生膨胀，则单位体积内包含的概率质量减少；
+如果流使空间压缩，则概率密度相应增加。图~\ref{fig:cnf-example}
+直观展示了连续流映射下样本分布及局部密度的同步变化。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-cnf-example}
+\caption{连续归一化流中的概率输运过程。简单分布中的样本经过连续流映射后，
+形成复杂数据分布；流过程中的拉伸和压缩对应概率密度的变化。}
+\label{fig:cnf-example}
+\end{figure}
+
+
+然而，直接计算式 (\ref{eq:cnf-change-variable}) 中从 $0$ 到 $t$
+的完整雅可比行列式在高维空间中代价很高。CNF 的关键思想是考虑无穷小时间
+变化。
+
+对数密度关于时间求导，可以得到瞬时变量替换公式：
+
+\begin{eqnarray}
+\frac{d\log p_t(\mathbf{x}(t))}{dt}
+&=&
+-\mathrm{Tr}
+\left(
+\frac{\partial f_{\theta}(\mathbf{x}(t),t)}
+{\partial\mathbf{x}(t)}
+\right)
+\nonumber\\
+&=&
+-\nabla_{\mathbf{x}}\cdot f_{\theta}(\mathbf{x}(t),t).
+\label{eq:cnf-instantaneous}
+\end{eqnarray}
+
+其中
+
+\[
+\mathrm{Tr}
+\left(
+\frac{\partial f_{\theta}}
+{\partial\mathbf{x}}
+\right)
+\]
+
+是向量场雅可比矩阵的迹，也称为散度。
+它描述了局部体积变化速率，而无需显式计算完整雅可比行列式。
+
+因此，状态变量和概率密度可以组成增广动力系统：
+
+\begin{eqnarray}
+\frac{d}{dt}
+\begin{bmatrix}
+\mathbf{x}(t)\\
+\log p_t(\mathbf{x}(t))
+\end{bmatrix}
+=
+\begin{bmatrix}
+f_{\theta}(\mathbf{x}(t),t)
+\\
+-\mathrm{Tr}
+(
+\frac{\partial f_{\theta}}
+{\partial\mathbf{x}}
+)
+\end{bmatrix}.
+\label{eq:cnf-augmented}
+\end{eqnarray}
+
+在本章采用的数据到先验的时间方向约定下：
+
+\[
+p_0=p_{\mathrm{data}},
+\qquad
+p_T=p_{\mathrm{prior}},
+\]
+
+沿时间方向积分式
+(\ref{eq:cnf-instantaneous})，得到
+
+\begin{eqnarray}
+\log p_0(\mathbf{x}(0))
+=
+\log p_T(\mathbf{x}(T))
++
+\int_0^T
+\mathrm{Tr}
+\left(
+\frac{\partial f_{\theta}(\mathbf{x}(t),t)}
+{\partial\mathbf{x}(t)}
+\right)
+dt .
+\label{eq:cnf-likelihood}
+\end{eqnarray}
+
+因此，CNF 使用同一个神经网络向量场同时完成三项任务：
+
+\begin{itemize}
+\item 将数据分布连续编码到简单先验分布；
+\item 从先验分布反向积分生成数据样本；
+\item 沿轨迹计算样本的概率密度。
+\end{itemize}
+
+相比离散归一化流需要设计特殊结构以保证雅可比行列式可计算，
+CNF只需要计算雅可比矩阵的迹，因此可以使用任意神经网络参数化向量场。
+在高维情况下，迹还可以通过 Hutchinson 估计器等随机方法近似，从而降低计算成本。
+
+模型训练完成后，生成样本无需计算密度项，只需从先验采样
+
+\begin{eqnarray}
+\mathbf{x}(T)\sim p_T,
+\end{eqnarray}
+
+然后沿式 (\ref{eq:cnf-ode}) 反向积分至 $t=0$，
+即可得到生成样本。
+
+不过，CNF 的似然训练仍然需要在优化过程中不断求解 ODE，
+并计算散度项。下一节介绍的 Flow Matching 则进一步改变训练方式：
+通过预先构造概率路径，直接监督路径上的局部速度，从而避免对未知流进行反复积分。
+
+
+\subsection{Flow Matching}
+
+连续归一化流可以通过似然学习向量场，但密度演化和散度计算会带来额外代价。
+如果能够预先构造连接先验分布与数据分布的概率路径，
+就可以直接监督路径上的局部速度，而不必先完整模拟一个未知流。
+Flow Matching 正是沿这一思路把动力学学习转化为向量场回归问题；
+本小节将介绍条件路径如何提供可计算的训练信号，以及局部条件速度如何汇集成整体的概率流。
+
+首先固定端点的联合分布，
+\[
+    (\mathbf{X}(0),\mathbf{X}(T))
+    \sim q_{0,T},
+    \qquad
+    \mathbf{X}(0)\sim p_0,
+    \quad
+    \mathbf{X}(T)\sim p_T.
+\]
+给定一对端点，通过可微插值映射
+\(I_t\) 构造\textbf{条件路径}
+\begin{equation}
+    \mathbf{X}(t)
+    =
+    I_t\bigl(\mathbf{X}(0),\mathbf{X}(T)\bigr),
+    \qquad
+    I_0(\mathbf{x}_0,\mathbf{x}_T)=\mathbf{x}_0,
+    \quad
+    I_T(\mathbf{x}_0,\mathbf{x}_T)=\mathbf{x}_T.
+    \label{eq:det-fm-interpolant}
+\end{equation}
+当端点对随机变化时，\(\mathbf{X}(t)\) 的边缘分布便形成一族
+\(\{p_t\}_{t\in[0,T]}\)。与先运行一个待学习的 ODE 不同，
+式~\eqref{eq:det-fm-interpolant} 允许直接在任意时刻构造训练状态。
+
+沿一条给定条件路径的目标速度为
+\begin{equation}
+    u_t\bigl(
+        \mathbf{X}(t)
+        \mid\mathbf{X}(0),\mathbf{X}(T)
+    \bigr)
+    =
+    \frac{\partial}{\partial t}
+    I_t\bigl(\mathbf{X}(0),\mathbf{X}(T)\bigr).
+    \label{eq:det-conditional-velocity}
+\end{equation}
+最常用的例子是端点之间的线性插值：
+\begin{equation}
+    \mathbf{X}(t)
+    =
+    \left(1-\frac{t}{T}\right)\mathbf{X}(0)
+    +
+    \frac{t}{T}\mathbf{X}(T),
+    \label{eq:det-linear-interpolant}
+\end{equation}
+相应的条件速度为
+\begin{equation}
+    u_t
+    =
+    \frac{\mathbf{X}(T)-\mathbf{X}(0)}{T}.
+    \label{eq:det-linear-conditional-velocity}
+\end{equation}
+对于固定端点对，式~\eqref{eq:det-linear-interpolant}
+是一条直线，式~\eqref{eq:det-linear-conditional-velocity}
+在时间上保持常数。由于端点、时间、中间状态和目标速度都能直接采样或计算，
+它们可以作为监督数据训练神经向量场
+\(v_{\boldsymbol{\theta}}(\mathbf{x},t)\)。
+
+条件 Flow Matching 的平方损失为
+\begin{equation}
+    \mathcal{L}_{\mathrm{CFM}}(\boldsymbol{\theta})
+    =
+    \mathbb{E}
+    \left[
+        \left\|
+            v_{\boldsymbol{\theta}}(\mathbf{X}(t),t)
+            -
+            u_t\bigl(
+                \mathbf{X}(t)
+                \mid\mathbf{X}(0),\mathbf{X}(T)
+            \bigr)
+        \right\|_2^2
+    \right],
+    \label{eq:det-cfm-loss}
+\end{equation}
+其中期望依次取自
+\[
+    t\sim\mathcal{U}[0,T],
+    \qquad
+    (\mathbf{X}(0),\mathbf{X}(T))\sim q_{0,T},
+    \qquad
+    \mathbf{X}(t)=I_t(\mathbf{X}(0),\mathbf{X}(T)).
+\]
+一次训练迭代只需采样端点和时间，解析构造中间状态与条件速度，
+再进行普通的向量回归；无须先用当前网络从 \(0\) 数值积分到 \(t\)。
+这里的“无模拟训练”仅指不需要模拟待学习的生成 ODE，
+并不意味着推断阶段不需要 ODE 求解器。
+
+同一位置 \(\mathbf{x}\) 和时刻 \(t\) 可能对应多组端点，
+因而也可能对应多个条件速度。平方损失的最优解不是记住某一条条件轨迹，
+而是这些速度在当前状态条件下的平均：
+\begin{equation}
+    v^{*}(\mathbf{x},t)
+    =
+    \mathbb{E}
+    \left[
+        u_t\bigl(
+            \mathbf{X}(t)
+            \mid\mathbf{X}(0),\mathbf{X}(T)
+        \bigr)
+        \,\middle|\,
+        \mathbf{X}(t)=\mathbf{x}
+    \right].
+    \label{eq:det-marginal-vector-field}
+\end{equation}
+在适当的正则条件下，式~\eqref{eq:det-marginal-vector-field}
+给出的边缘向量场满足
+\begin{equation}
+    \frac{\partial p_t(\mathbf{x})}{\partial t}
+    +
+    \nabla_{\mathbf{x}}\cdot
+    \left(
+        p_t(\mathbf{x})v^{*}(\mathbf{x},t)
+    \right)
+    =
+    0,
+    \label{eq:det-fm-continuity}
+\end{equation}
+因而产生的恰是条件路径混合后的边缘概率路径。
+这一步解释了为什么可以用容易计算的条件速度监督一个只接收
+\((\mathbf{x},t)\) 的全局向量场。图~\ref{fig:marginal-vector-field}
+展示了多条条件轨迹的局部速度如何通过条件期望汇集为边缘向量场。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-marginal-vector-field}
+\caption{流匹配中的边缘向量场学习示意图。灰色线条表示由不同端点对确定的条件轨迹，蓝点表示同一时刻附近的中间状态；红色箭头表示在给定当前状态后对条件速度取期望所得的边缘向量场。}
+\label{fig:marginal-vector-field}
+\end{figure}
+
+推断时，从
+\(\mathbf{x}(T)\sim p_T\)
+出发，将
+\begin{equation}
+    \frac{\mathrm{d}\mathbf{x}(t)}{\mathrm{d}t}
+    =
+    v_{\boldsymbol{\theta}}(\mathbf{x}(t),t)
+    \label{eq:det-fm-generation-ode}
+\end{equation}
+从 \(T\) 反向求解到 \(0\)。
+例如，反向欧拉更新为
+\begin{equation}
+    \mathbf{x}(t-h)
+    \approx
+    \mathbf{x}(t)
+    -
+    h\,v_{\boldsymbol{\theta}}(\mathbf{x}(t),t),
+    \qquad h>0.
+    \label{eq:det-fm-backward-euler}
+\end{equation}
+这里没有另行把向量场定义为负号；
+负号来自时间步长由 \(t\) 走向 \(t-h\)。
+若 \(v_{\boldsymbol{\theta}}\) 准确逼近边缘向量场，
+反向流便将先验 \(p_T\) 输运回数据分布 \(p_0\)。
+模型误差与数值积分误差则共同决定最终样本对目标分布的近似程度。
+
+\subsection{概率路径设计}
+
+如前所述，流匹配旨在学习一个向量场 $v_\theta(\mathbf{x}(t), t)$，该向量场能够诱导一个概率流，从而将简单的先验分布 $p_T$ 转换为复杂的数据分布 $p_0$。其核心目标是最小化学到的速度场与将样本沿选定路径传输的真实条件速度之间的差异（公式 \ref{eq:det-cfm-loss}）。然而，问题源于数据分布 $p_0$ 与噪声分布 $p_T$ 之间的耦合。
+
+流匹配模型的初始训练阶段，通常称为 1-修正流，数据点 $\mathbf{x}(0)$ 和噪声点 $\mathbf{x}(T)$ 从其各自的分布中随机配对。这种随机配对导致一种现象：高维潜在空间中的轨迹经常相交。当多条直线轨迹在时空中的同一点 $\mathbf{x}(t)$ 相交时，学到的边际向量场 $v_\theta(\mathbf{x}(t), t)$（即这些不同相交速度的期望）会变得弯曲。因此，在积分常微分方程时实际遵循的路径不再是直的，这导致在数值求解器中采用大步长时会产生更多的离散化误差 \citep{zhang-etal:2025:flow,yang-etal:2025text}。在修正流框架中，可以通过减少条件路径之间的干扰来改善噪声分布与数据分布之间的耦合。首先，使用随机配对 $(\mathbf{x}(0), \mathbf{x}(T))$ 训练一个 1-修正流 $v_{\theta}^1$。然后，使用训练好的模型 $v_{\theta}^1$ 生成一个新的合成数据集。具体来说，对于一组噪声样本 $\{\mathbf{x}_i(T)\}$，求解常微分方程 $\frac{d\mathbf{x}(t)}{dt} = -v_{\theta}^1(\mathbf{x}, t)$ 以获得对应的生成数据样本 $\{\hat{\mathbf{x}}_i(0)\}$。这样就创建了一组确定性的、重新连接的对 $(\hat{\mathbf{x}}_i(0), \mathbf{x}_i(T))$。最后，使用这些对齐的对来训练一个新模型 $v_{\theta}^2$（称为 2-修正流）。由于 $\hat{\mathbf{x}}_i(0)$ 是通过第一个模型的动力学从 $\mathbf{x}_i(T)$ 生成的，这些潜在空间中的对是高度对齐的。因此，得到的向量场明显更加线性。
+
+对直线轨迹的探索根植于最优传输原理和 Wasserstein 距离的最小化。该领域的一个重要结果是，对于从高斯分布到两个高斯混合分布的修正流，只需几次修正就足以实现直线流。这一见解支撑了 InstaFlow 和 Stable Diffusion 等模型的经验成功，这些模型利用修正流的直线化特性来减少函数评估次数，同时保持样本质量 \citep{esser-etal:2024scaling}。这些商业化模型的成功也表明，采用修正流的扩散模型可以很好地扩展用于高质量图像生成。
+
+轨迹的直线性还与学到的向量场的 Lipschitz 常数有关。如果 1-修正流是 $L$-Lipschitz 的，则可以防止附近的噪声样本映射到任意远的数据点。然而，在实践中，$L$ 可能很大，导致在生成的早期阶段传输路径出现显著弯曲。这种弯曲会降低一步欧拉采样的精度，可能需要进一步的修正或更先进的采样调度。
+
+轨迹修正的实际实现也涉及架构改进。研究人员已用复杂的多模态扩散 Transformer（MMDiT）取代了简单的 U-Net 架构。例如，Stable Diffusion 3 引入了 MMDiT 架构 \citep{esser-etal:2024scaling}，而 Flux.1 进一步将修正流 Transformer 架构扩展到 120 亿参数 \citep{greenberg-etal:2025demystifying}。这表明扩散模型可以扩展到非常大的规模，同时保持高采样效率。
+
+为了进一步提高效率和稳定性，也可以将分治策略应用于修正流。例如，分段修正流（PeRFlow）将生成轨迹划分为几个离散的时间窗口 \citep{yan-etal:2024perflow}。它不是拉直全局流，而是单独拉直每个区间内的片段，这种局部化降低了模拟训练轨迹的计算成本，并最小化了数值误差。此外，研究人员通过先进的引导技术解决了条件生成的稳定性问题。例如，Rectified-CFG++ 采用了一种自适应预测器-校正器方案 \citep{saini-etal:2025rectified}。每个生成步骤首先执行条件更新，将样本锚定在学到的传输路径附近，然后基于条件速度与无条件速度之间的差异应用流形感知校正。这确保了采样轨迹保持在数据流形的一个稳定管状邻域内。
+
+\begin{exercisebox}
+  \begin{enumerate}
+    \item 一维样本满足 \(\mathrm dx/\mathrm dt=2\)，且 \(x(0)\sim\mathcal N(0,1)\)。写出流映射 \(\Phi_{0\to t}\) 和时刻 \(t\) 的边缘分布 \(p_t\)。
+    \item 对线性向量场 \(f(\boldsymbol x,t)=a\boldsymbol x\)，求其散度以及沿轨迹的对数密度变化率。若 \(a>0\)，概率密度沿轨迹为何会下降？
+    \item 写出 CNF 同时追踪状态与对数密度的增广动力系统，并说明它为什么只需要雅可比的迹，而不需要完整流映射的高维雅可比行列式。
+    \item 比较连续归一化流与 Flow Matching 的训练目标、监督信号和生成阶段。二者分别在哪些情形下更适合用于显式似然建模或直接向量场学习？
+    \item 随机端点配对即使采用直线条件路径，学到的边缘轨迹仍可能弯曲。请解释原因，并设计从 1-修正流得到 2-修正流的基本训练流程。
+  \end{enumerate}
+\end{exercisebox}
+
+\section{随机概率动力学}
+
+上一节讨论了如何利用确定性向量场推动样本运动，并由大量样本轨迹共同实现概率分布之间的连续输运。在这一框架下，一旦给定初始状态和向量场，样本的演化轨迹便由相应的常微分方程唯一确定。
+
+然而，确定性输运并不是连续时间生成建模的唯一方式。另一类重要方法允许样本在演化过程中持续受到随机扰动，从而以随机动力学的方式连接数据分布与简单先验分布。与确定性流相比，此时即使从相同的初始状态出发，不同的随机扰动也可能产生不同的样本路径；但从整体上看，大量随机轨迹仍然刻画了一族随时间连续变化的概率分布。
+
+~\textbf{扩散模型}正是建立在这一思想之上的代表性方法。本节将主要从随机微分方程的视角理解扩散生成过程，将其视为概率分布在连续时间中的随机演化，而不以传统扩散模型的离散时间构造为叙述起点。诸如 DDPM 中具体的离散加噪过程、变分下界推导、网络参数化形式及工程实现细节，虽然对于完整理解扩散模型十分重要，但并非本节讨论的重点。
+
+本节也不旨在覆盖扩散模型的所有理论与实现细节，而是希望建立一套统一的连续时间观点：理解随机扰动如何推动概率分布演化，正向过程与反向生成过程如何建立联系，以及随机动力学如何进一步关联到确定性的概率流描述。通过这一视角，扩散模型可以被放置在更一般的连续时间生成框架中，并与前文介绍的确定性概率输运方法形成对照。
+
+图~\ref{fig:autoencoder} 从结构上对比了自编码器的单次编码--解码映射与扩散模型的多时刻概率演化。这里的重点并非把两者视为同一种模型，而是突出扩散模型在数据分布与先验分布之间显式定义了正向扰动和反向生成过程。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-autoencoder}
+\caption{自编码器与扩散模型的对比。上部为自编码器通过编码器和解码器完成的数据重构；下部为扩散模型在数据分布 \(p_0\) 与先验分布 \(p_T\) 之间建立的正向扰动过程和反向生成过程。}
+\label{fig:autoencoder}
+\end{figure}
+
+下面先建立随机微分方程的基本构成，再依次讨论正向扩散、
+反向 SDE、分数学习与概率流 ODE，最后回到数值采样问题，
+说明连续时间模型如何落实为有限步生成算法。
+
+\begin{importantnote}
+\textbf{新概念：}分数函数 \(\nabla_{\boldsymbol{x}}\log p_t(\boldsymbol{x})\) 指向当前密度增长最快的方向。它把正向 SDE 造成的概率扩散转化为可逆转的局部信息：将其加入反向漂移后，可以从简单先验逐步恢复数据分布。
+
+\textbf{重难点解析：}反向 SDE 的漂移修正系数为 \(g(t)^2\)，而共享相同边缘分布的概率流 ODE 使用 \(\tfrac12 g(t)^2\)。二者的等价仅指每个时刻的边缘分布一致，并不表示样本路径相同。推导和实现时还要同时核对反向时间增量的符号，避免把“方程中的漂移方向”和“数值积分的时间方向”混为一谈。
+\end{importantnote}
+
+\subsection{随机微分方程}
+
+常微分方程只用向量场描述给定状态处的确定性变化率，
+不足以表达持续注入的随机扰动。随机微分方程在确定性漂移之外
+加入由布朗运动驱动的扩散项，从而把“平均演化趋势”和“随机波动强度”
+纳入同一个连续时间模型。本小节将先澄清漂移、扩散系数和随机增量各自的作用，
+为区分样本路径与边缘分布的演化作准备。
+
+\textbf{随机微分方程的基本形式:}随机微分方程（SDE）是一种包含一个或多个随机过程项的微分方程。通常，它描述一个同时受到确定性力（可预测的趋势）和随机噪声（不可预测的波动）影响的系统的演化。
+
+为了理解这一点，首先回顾描述状态向量 $\mathbf{x}(t)$ 随时间 $t$ 演化的标准常微分方程（ODE）：$\frac{d\mathbf{x}(t)}{dt} = f(\mathbf{x}(t), t)$。这里，$f(\cdot)$ 是一个描述状态速度的确定性向量场。给定初始条件 $\mathbf{x}(0)$，未来的轨迹就完全确定了。
+
+然而，在扩散模型中，需要持续地向数据引入随机噪声。为了形式化这一点，必须在方程中添加一个随机项。由于标准布朗运动处处不可微，不能简单地写成 $\frac{d\mathbf{x}(t)}{dt} = f + \text{noise}$。相反，应以包含随机分量的微分形式写出方程：
+\begin{eqnarray}
+d\mathbf{x}(t) & = & \underbrace{f(\mathbf{x}(t), t) dt}_{\text{deterministic}} + \underbrace{g(t) d\mathbf{w}(t)}_{\text{stochastic}}.
+\label{eq:forward-sde}
+\end{eqnarray}
+
+这是一个通用的伊藤（It{\^o}）SDE 。该方程的组成部分定义如下：
+
+\begin{itemize}
+\item 漂移系数 $f(\mathbf{x}(t), t) \in \mathbb{R}^d$ 表示演化的确定性部分，类似于常微分方程中的向量场。它决定了演化的一般趋势。
+\item 扩散系数 $g(t)$ 通常是一个标量函数，用于控制在时间 $t$ 注入系统的随机噪声的幅度。
+\item 维纳过程（也称为布朗运动）$\mathbf{w}(t) \in \mathbb{R}^d$ 表示随机性的来源。增量 $d\mathbf{w}(t)$ 可以视为一个均值为 $\mathbf{0}$、协方差为 $dt \cdot \mathbf{I}$ 的无穷小高斯噪声向量。
+\end{itemize}
+
+方程 (\ref{eq:forward-sde}) 被称为前向 SDE。通过使用这个 SDE，我们定义了一个前向过程，当时间 $t$ 从 $0$ 流向 $T$ 时，该过程逐渐向数据样本 $\mathbf{x}(0) \sim p_{\text{data}}$ 添加噪声。在此过程中，分布 $p_t(\mathbf{x}(t))$ 扩散，并且 $\mathbf{x}(T)$ 的分布最终将收敛到一个已知的先验分布（通常是 $\mathcal{N}(\mathbf{0}, \mathbf{I})$），如图 \ref{fig:forward-sde-example}所示。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-forward-sde-example}
+\caption{确定性轨迹与随机轨迹对比。ODE 为给定初值指定确定性轨迹；SDE 的扩散项持续注入高斯噪声，使相同初始状态可对应不同的样本轨迹。}
+\label{fig:forward-sde-example}
+\end{figure}
+
+\subsection{正向扩散过程}
+
+有了随机动力学的一般形式，还需要选择怎样的漂移和扩散强度，
+才能把复杂的数据分布平稳地转化为简单先验。
+正向扩散过程通过随时间逐步削弱数据信号并增加噪声来完成这一任务，
+其噪声调度决定中间分布、终点先验以及后续反演的难度。
+本小节将从这一设计目标出发说明正向过程如何构造训练所需的带噪样本。
+
+
+\textbf{方差爆炸与方差保持随机微分方程：} 现在转向定义前向随机微分方程，即在方程 \eqref{eq:forward-sde} 中定义漂移系数 $f(\mathbf{x}(t),t)$ 和扩散系数 $g(t)$。构建前向 SDE 有多种方法，这里考虑两种常用方法，它们分别对应噪声条件分数网络（NCSN）和去噪扩散概率模型（DDPM）的连续时间极限，称为\textbf{方差爆炸}（VE）和\textbf{方差保持}（VP）SDE。
+
+在 \textbf{NCSN} 框架中，前向过程通过一系列递增的高斯噪声水平 $\{\sigma_1, \sigma_2, \dots, \sigma_N\}$（其中 $\sigma_1 < \sigma_2 < \dots < \sigma_N$）扰动数据。考虑一个离散过程，其中第 $i$ 步的状态 $\mathbf{x}_i$ 通过从 $\mathbf{x}_{i-1}$ 添加必要噪声量使总方差从 $\sigma_{i-1}^2$ 增加到 $\sigma_i^2$ 演化而来，其更新规则为：
+\begin{eqnarray}
+\mathbf{x}_i = \mathbf{x}_{i-1} + \sqrt{\sigma_i^2 - \sigma_{i-1}^2} \boldsymbol{\epsilon}_i,
+\end{eqnarray}
+其中 $\boldsymbol{\epsilon}_i \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ 表示第 $i$ 步的增量噪声。该模型确保若从数据 $\mathbf{x}_0$ 出发，第 $i$ 步在给定 $\mathbf{x}_0$ 条件下的分布具有 $\sigma_i^2$ 的方差。
+
+现在转向连续极限。定义关于时间 $t$ 的连续方差函数 $\sigma(t)$。当步数趋近无穷大（$N \to \infty$）时，离散时间间隔趋近于零（$\Delta t \to 0$）。相邻步间的方差差变为微分：
+\begin{equation}
+\sigma_i^2 - \sigma_{i-1}^2 \approx \frac{d\sigma^2(t)}{dt} \Delta t.
+\end{equation}
+回忆随机微积分中，维纳过程增量 $d\mathbf{w}$ 与 $\sqrt{\Delta t}$ 成比例（即 $\sqrt{\Delta t} \boldsymbol{\epsilon}_i \approx d\mathbf{w}(t)$）。通过替换方差差可重写更新规则：
+\begin{eqnarray}
+\mathbf{x}_i - \mathbf{x}_{i-1} & \approx & \sqrt{\frac{d\sigma^2(t)}{dt} \Delta t} \; \boldsymbol{\epsilon}_i.
+\end{eqnarray}
+
+取极限 $\Delta t \to 0$ 后，得到连续时间 SDE：
+\begin{eqnarray}
+d\mathbf{x}(t) & = & \sqrt{\frac{d\sigma^2(t)}{dt}} d\mathbf{w}(t).
+\label{eq:ve-sde}
+\end{eqnarray}
+该 SDE 中漂移系数定义为 $f(\mathbf{x}(t), t) = \mathbf{0}$，扩散系数为 $g(t) = \sqrt{\frac{d\sigma^2(t)}{dt}}$。由于分布方差随 $t \to T$ 单调递增，此 SDE 将数据分布映射至具有不断增大方差的噪声分布，因此称为方差爆炸 SDE。
+
+以图像生成为例，可以把
+\(\mathbf{x}_0\)
+看作一张清晰图像的像素向量。
+随着时间 \(t\) 增大，系统不断向图像中注入高斯噪声：
+开始时，图像中的轮廓和纹理仍然清晰可辨；
+随后，细节逐渐被噪声掩盖；
+当 \(t\) 接近终止时刻 \(T\) 时，
+原始图像的语义结构几乎完全消失，
+状态接近高方差的随机噪声。
+
+这里的扩散系数
+\[
+    g(t)
+    =
+    \sqrt{
+        \frac{\mathrm{d}\sigma^2(t)}
+        {\mathrm{d}t}
+    }
+\]
+可以理解为单位时间内噪声方差增加的速度：
+\(\sigma^2(t)\) 增长越快，
+图像在该时刻受到的随机扰动就越强。
+因此，方差爆炸 SDE 描述的是一个连续加噪过程：
+样本没有确定性的漂移趋势，
+而是在不断累积的随机扰动下，
+由具有复杂结构的数据逐渐演化为高方差噪声。（缺图）
+
+\textbf{DDPM}框架采用不同的噪声注入策略。不同于简单地增加方差噪声，它在每一步重新缩放数据以保持方差有界。在离散公式中，前向过程由方差调度 $0 < \beta_1 < \beta_2 < \dots < \beta_N < 1$ 定义，从 $\mathbf{x}_{i-1}$ 到 $\mathbf{x}_i$ 的转移由下式给出：
+\begin{eqnarray}
+\mathbf{x}_i = \sqrt{1 - \beta_i} \mathbf{x}_{i-1} + \sqrt{\beta_i} \boldsymbol{\epsilon}_i,
+\end{eqnarray}
+其中 $\boldsymbol{\epsilon}_i \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$。与 NCSN 公式不同，系数 $\sqrt{1 - \beta_i}$ 会收缩前一状态的均值。该设计确保若输入数据服从标准正态分布，则每步边缘分布仍保持标准正态，即方差得以保持。
+
+此时增量 $\mathbf{x}_i - \mathbf{x}_{i-1}$ 可表示为：
+\begin{eqnarray}
+\mathbf{x}_i - \mathbf{x}_{i-1} & = & (\sqrt{1 - \beta_i} - 1) \mathbf{x}_{i-1} + \sqrt{\beta_i} \boldsymbol{\epsilon}_i.
+\label{eq:vp-increment-equation}
+\end{eqnarray}
+为获得连续时间 SDE，再次令 $N \to \infty$ 并引入连续函数 $\beta(t)$ 使得 $\beta_i \approx \beta(t) \Delta t$。利用泰勒展开近似 $\sqrt{1 - x} \approx 1 - \frac{1}{2}x$（当 $x$ 较小时），有 $\sqrt{1 - \beta(t) \Delta t} - 1 \approx -\frac{1}{2}\beta(t) \Delta t$。将其代入式 \eqref{eq:vp-increment-equation} 并应用缩放规则 $\sqrt{\beta(t) \Delta t} \boldsymbol{\epsilon}_i \approx \sqrt{\beta(t)} d\mathbf{w}(t)$，可得极限：
+\begin{eqnarray}
+d\mathbf{x}(t) & = & -\frac{1}{2} \beta(t) \mathbf{x}(t) d t + \sqrt{\beta(t)} d\mathbf{w}(t).
+\label{eq:vp-sde}
+\end{eqnarray}
+
+此 SDE 中漂移系数为 $f(\mathbf{x}(t), t) = -\frac{1}{2} \beta(t) \mathbf{x}(t)$，扩散系数为 $g(t) = \sqrt{\beta(t)}$。漂移项作为恢复力将状态拉向原点（零均值），从而抵消扩散项注入的方差。因此，若初始分布具有单位方差，整个过程方差将保持恒定。故式 \eqref{eq:vp-sde} 称为方差保持 SDE。
+
+为简洁起见，此处未明确定义参数 $\{\sigma_i\}$（或 $\sigma(t)$）和 $\{\beta_i\}$（或 $\beta(t)$）的函数形式。值得注意的是，DDPM 中常引入辅助变量（如 $\alpha_i = 1 - \beta_i$ 和 $\bar{\alpha}_i = \prod_{s=1}^i \alpha_s$）以简化推导与实现。调度参数的精心设计可使模型在终止时刻接近预先选定的先验分布。
+
+虽然这里重点是通过连续时间 SDE 公式建立统一的理论基础，但实践中扩散模型通常通过离散化步骤实现（见表 \ref{tab:vp-and-ve-sdes}）。NCSN 和 DDPM 方法中引入的离散变量 $\mathbf{x}_i$ 本质上是连续过程的数值近似。实际实现中，通过迭代这些离散时间步 $\{\mathbf{x}_i\}$ 来模拟 SDE 演化。
+
+\begin{table}[!t]
+\centering
+\begingroup
+\renewcommand{\arraystretch}{1.3}
+\small
+\begin{tabular}{r | l | l}
+条目 & 方差爆炸（NCSN） & 方差保持（DDPM） \\ \hline
+漂移系数 $f(\mathbf{x}(t), t)$ & $\mathbf{0}$ & $-\frac{1}{2} \beta(t) \mathbf{x}(t)$ \\
+扩散系数 $g(t)$ & $\sqrt{\frac{d\sigma^2(t)}{dt}}$ & $\sqrt{\beta(t)}$ \\
+连续时间 SDE & $d\mathbf{x}(t) = \sqrt{\frac{d\sigma^2(t)}{dt}} d\mathbf{w}(t)$ & $d\mathbf{x}(t) = -\frac{1}{2} \beta(t) \mathbf{x}(t) d t$ \\
+& & \hspace{1.25cm} $+ \sqrt{\beta(t)} d\mathbf{w}(t)$ \\ \hline
+迭代扩散（离散） & $\mathbf{x}_i = \mathbf{x}_{i-1} + \sqrt{\sigma_i^2 - \sigma_{i-1}^2} \boldsymbol{\epsilon}_i$ & $\mathbf{x}_i = \sqrt{1 - \beta_i} \mathbf{x}_{i-1} + \sqrt{\beta_i} \boldsymbol{\epsilon}_i$ \\
+单步扩散（离散） & $\mathbf{x}_i = \mathbf{x}_0 + \sigma_i \boldsymbol{\epsilon}$ & $\mathbf{x}_i = \sqrt{\bar{\alpha}_i} \mathbf{x}_0 + \sqrt{1 - \bar{\alpha}_i} \boldsymbol{\epsilon}$
+\end{tabular}
+\endgroup
+\caption{VP 和 VE SDE 的连续时间与离散时间形式。$\mathbf{x}(t)$、$\mathbf{w}(t)$、$\sigma(t)$ 和 $\beta(t)$ 是时间 $t$ 的连续函数；$\mathbf{x}_i$ 是离散时间步 $i$ 的状态。}
+\label{tab:vp-and-ve-sdes}
+\end{table}
+
+
+
+
+
+
+\subsection{反向 SDE 与分数函数}
+
+正向过程能够产生从数据到噪声的随机轨迹，生成任务却要求从先验噪声回到数据分布。
+随机过程的时间反转表明，反向 SDE 除了包含前向漂移和扩散信息，
+还依赖各时刻对数密度关于状态的梯度，即分数函数。
+因此，反向生成的核心困难从“如何添加噪声”转化为
+“如何获得未知中间分布的分数”，这也自然引出下一小节的学习方法。
+
+在本节采用的状态无关标量扩散系数 $g(t)$ 的设定下，前向 SDE
+存在一个对应的反向时间 SDE。如果从 $t=T$ 到 $0$ 反向模拟这个过程，
+就可以从先验分布生成数据样本。反向 SDE 由下式给出：
+\begin{eqnarray}
+d\mathbf{x}(t) & = & \left[ f(\mathbf{x}(t), t) - g(t)^2 \nabla_{\mathbf{x}(t)} \log p_t(\mathbf{x}(t)) \right] dt + g(t) d\bar{\mathbf{w}}(t).
+\label{eq:backward-sde}
+\end{eqnarray}
+
+\noindent 其中 $dt$ 表示一个无穷小的负时间增量，$d\bar{\mathbf{w}}(t)$ 是反向时间中的一个标准维纳过程，而 $\nabla_{\mathbf{x}(t)} \log p_t(\mathbf{x}(t))$ 是概率密度对数相对于数据的梯度，也称为\textbf{分数函数}。给定一个前向 SDE（方程 \eqref{eq:forward-sde}），如果能够访问分数函数，就可以使用反向 SDE（方程 \eqref{eq:backward-sde}）将样本从先验噪声 $p_T$ 传输回数据分布 $p_0$。
+
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=\textwidth]
+%     {figures/forward_reverse_sde_redrawn.pdf}
+%     \caption{扩散模型中的前向随机微分方程与反向随机微分方程。}
+%     \label{fig:forward-reverse-sde}
+% \end{figure}
+
+
+
+将反向 SDE 用于生成建模，需要具备两个基本要素。
+首先，需要选取合适的前向 SDE，使复杂的数据分布
+\(p_0\) 能够逐渐转化为易于采样的先验分布 \(p_T\)；
+上一小节介绍的 VE SDE 与 VP SDE 正是两类常用构造。
+其次，需要获得反向漂移项中的分数函数
+\begin{equation}
+    \mathbf{s}_t(\mathbf{x})
+    =
+    \nabla_{\mathbf{x}}\log p_t(\mathbf{x}).
+    \label{eq:reverse-sde-score-function}
+\end{equation}
+一旦这两个要素确定，便可以从先验分布出发，
+通过数值求解反向 SDE 逐步生成数据样本。
+
+因此，在选定前向扩散过程之后，
+反向生成所面临的主要困难便集中在分数函数的获取上。
+中间时刻的边缘分布
+\(p_t(\mathbf{x})\)
+由数据分布经过随机扩散得到，
+通常既没有可计算的归一化密度，
+也无法直接求出其对数梯度。
+实际训练中能够获得的通常只有来自
+\(p_0\) 的数据样本，
+而不是真实分数
+\(\nabla_{\mathbf{x}}\log p_t(\mathbf{x})\)。
+这意味着，分数函数无法像普通监督学习中的标签一样直接使用。
+
+\subsection{去噪分数匹配}
+
+
+反向 SDE 表明，生成过程所需要获得的核心对象是各时刻边缘分布的分数函数
+\[
+    \nabla_{\mathbf{x}(t)}
+    \log p_t\bigl(\mathbf{x}(t)\bigr).
+\]
+然而，边缘分布
+\(p_t(\mathbf{x}(t))\)
+由数据分布经过随机扩散得到，
+通常没有可直接计算的密度表达式，
+因而无法将其真实分数作为监督信号。
+
+前向扩散过程是人为设计的，
+因此，给定原始数据
+\(\mathbf{x}(0)\)
+后，条件转移分布
+\[
+    p\bigl(\mathbf{x}(t)\mid\mathbf{x}(0)\bigr)
+\]
+及其条件分数通常容易计算。
+去噪分数匹配正是利用这一性质，
+以已知的条件分数构造训练目标，
+从而避免直接计算未知边缘分布的分数，
+并将分数估计转化为可以由神经网络求解的回归问题。
+
+以加性高斯扰动为例，在时刻 \(t\)，
+带噪样本可以写为
+\begin{equation}
+    \mathbf{x}(t)
+    =
+    \mathbf{x}(0)
+    +
+    \sigma(t)\boldsymbol{\epsilon},
+    \qquad
+    \boldsymbol{\epsilon}
+    \sim
+    \mathcal{N}(\mathbf{0},\mathbf{I}),
+    \label{eq:gaussian-perturbation-sampling}
+\end{equation}
+因此，其条件转移分布为
+\begin{equation}
+    p\bigl(\mathbf{x}(t)\mid\mathbf{x}(0)\bigr)
+    =
+    \mathcal{N}
+    \bigl(
+        \mathbf{x}(0),
+        \sigma(t)^2\mathbf{I}
+    \bigr).
+    \label{eq:gaussian-perturbation-kernel}
+\end{equation}
+该条件分布关于带噪状态
+\(\mathbf{x}(t)\)
+的分数可以显式计算为
+\begin{align}
+    \nabla_{\mathbf{x}(t)}
+    \log
+    p\bigl(\mathbf{x}(t)\mid\mathbf{x}(0)\bigr)
+    &=
+    -
+    \frac{
+        \mathbf{x}(t)-\mathbf{x}(0)
+    }{
+        \sigma(t)^2
+    }
+    \notag\\
+    &=
+    -
+    \frac{
+        \boldsymbol{\epsilon}
+    }{
+        \sigma(t)
+    }.
+    \label{eq:gaussian-conditional-score}
+\end{align}
+因此，只需从数据集中采样
+\(\mathbf{x}(0)\)，
+再按照式~\eqref{eq:gaussian-perturbation-sampling}
+生成带噪样本，
+便可以同时得到可计算的条件分数目标。
+去噪分数匹配由此绕开了未知边缘密度
+\(p_t(\mathbf{x}(t))\)
+的显式求解。
+
+去噪分数匹配的基本等价性表明，训练一个神经网络 $s_\theta(\mathbf{x}(t), t)$ 来近似这个条件分数，等价于学习边缘分数 $\nabla_{\mathbf{x}(t)} \log p_t(\mathbf{x}(t))$。因此，生成建模的目标可以有效地简化为一个去噪回归问题。
+
+形式上，希望最小化估计分数与真实条件分数之间的期望平方欧几里得距离：
+\begin{eqnarray}
+\mathcal{L}(\theta) & = & \mathbb{E}_{t, \mathbf{x}(0), \boldsymbol{\epsilon}} \left[ \lambda(t) \left\| s_\theta(\mathbf{x}(t), t) - \left( -\frac{\boldsymbol{\epsilon}}{\sigma(t)} \right) \right\|^2 \right],
+\end{eqnarray}
+其中 $\lambda(t)$ 是一个正权重函数。一个常见的选择是 $\lambda(t) = \sigma(t)^2$，这可以平衡不同噪声水平下分数的大小。
+
+通过代入此权重并重新整理项，目标简化为：
+\begin{eqnarray}
+\mathcal{L}(\theta) & = & \mathbb{E}_{t, \mathbf{x}(0), \boldsymbol{\epsilon}} \left[ \left\| \boldsymbol{\epsilon} + \sigma(t) s_\theta(\mathbf{x}(0) + \sigma(t)\boldsymbol{\epsilon}, t) \right\|^2 \right].
+\end{eqnarray}
+令噪声预测网络满足
+$\boldsymbol{\epsilon}_\theta(\mathbf{x}(t),t)=-\sigma(t)s_\theta(\mathbf{x}(t),t)$，
+上述目标就是标准高斯噪声 $\boldsymbol{\epsilon}$ 的均方误差预测目标。
+
+上述方法与\textbf{基于能量的模型}（EBM）存在理论联系。在统计物理学中，概率分布通常通过能量函数 $E_\theta(\mathbf{x})$ 表示为 $p_\theta(\mathbf{x}) = \frac{\exp(-E_\theta(\mathbf{x}))}{Z_\theta}$，其中 $Z_\theta$ 是归一化常数或配分函数。
+
+对分数函数而非似然本身进行建模的一个优点是，它可以绕开难以处理的归一化常数 $Z_\theta$ 的计算。对于图像这样的高维连续数据，计算 $Z_\theta = \int \exp(-E_\theta(\mathbf{x})) d\mathbf{x}$ 通常难以处理。基于分数的模型避免了这个问题，因为对数配分函数关于数据的梯度为零，即 $\nabla_{\mathbf{x}} \log Z_\theta = 0$。因此有
+\begin{eqnarray}
+\nabla_{\mathbf{x}} \log p_\theta(\mathbf{x}) & = & \nabla_{\mathbf{x}} \left( -E_\theta(\mathbf{x}) - \log Z_\theta \right) \nonumber \\
+& = & -\nabla_{\mathbf{x}} E_\theta(\mathbf{x}).
+\end{eqnarray}
+这一特性允许在不评估配分函数的情况下训练未归一化的模型。
+
+一旦分数网络 $s_\theta(\mathbf{x}, t)$ 训练完成，就可以用它来生成新样本。具体来说，将学习到的近似值 $s_\theta(\mathbf{x}(t), t) \approx \nabla_{\mathbf{x}(t)} \log p_t(\mathbf{x}(t))$ 代入方程 \eqref{eq:backward-sde}，得到
+\begin{equation}
+d\mathbf{x}(t) = \left[ f(\mathbf{x}(t), t) - g(t)^2 s_\theta(\mathbf{x}(t), t) \right] dt + g(t) d\bar{\mathbf{w}}(t).
+\label{eq:learned-reverse-sde}
+\end{equation}
+在测试时，从先验分布（例如 $\mathcal{N}(\mathbf{0}, \mathbf{I})$）初始化 $\mathbf{x}(T)$，并使用欧拉--丸山方法等数值求解器，从 $t=T$ 到 $t=0$ 反向积分该方程。通过逐步去除噪声，这个过程将初始的噪声样本转化为目标数据分布的样本。
+
+\subsection{概率流 ODE}
+
+分数模型训练完成后，反向 SDE 给出一种随机采样方式，
+但同一族边缘概率分布并不只对应随机样本路径。
+通过把扩散对密度的作用重新写成确定性的概率通量，
+可以构造与该 SDE 具有相同边缘分布的概率流 ODE。
+这一结果并不意味着两者的单条轨迹相同，
+而是为同一分布演化提供了随机与确定性两种实现，并使前一节的 ODE 求解工具能够再次用于生成。
+
+基于分数的生成模型中一个重要的理论结果是：扩散型随机微分方程描述的随机过程具有边缘分布等价的确定性表示。
+对于本节形式的 SDE，即扩散系数是状态无关的标量函数 $g(t)$，
+存在一个对应的确定性 ODE，其轨迹产生的边缘概率密度
+$\{p_t(\mathbf{x}(t))\}_{t=0}^T$ 与随机微分方程相同。
+
+该常微分方程被称为概率流 ODE，其表达式为
+\begin{eqnarray}
+\frac{d\mathbf{x}(t)}{dt} & = & f(\mathbf{x}(t), t) - \frac{1}{2}g(t)^2 \nabla_{\mathbf{x}(t)} \log p_t(\mathbf{x}(t)).
+\label{eq:probability-flow-ode}
+\end{eqnarray}
+
+推导过程依赖于 Fokker--Planck 方程（又称 Kolmogorov 前向方程），该方程描述随机微分方程动力学下概率密度函数 $p_t(\mathbf{x})$ 的时间演化。可以证明，式 \eqref{eq:probability-flow-ode} 中 ODE 导出的连续性方程与式 \eqref{eq:forward-sde} 中 SDE 的 Fokker--Planck 方程完全一致。因此，如果采样 $\mathbf{x}(T) \sim p_T$ 并逆向求解该 ODE（从 $T$ 到 $0$），所得样本 $\mathbf{x}(0)$ 将服从数据分布 $p_0$，这与逆向随机微分方程在边缘分布上的结果相同。
+
+这种等价性为随机视角与确定性视角建立了联系。需注意式 \eqref{eq:probability-flow-ode} 依赖于分数函数 $\nabla_{\mathbf{x}(t)} \log p_t(\mathbf{x}(t))$。这意味着一旦训练好分数模型 $s_\theta(\mathbf{x}(t), t)$，即可直接用于构建概率流 ODE：
+\begin{eqnarray}
+\frac{d\mathbf{x}(t)}{dt} & \approx & f(\mathbf{x}(t), t) - \frac{1}{2}g(t)^2 s_\theta(\mathbf{x}(t), t).
+\label{eq:learned-probability-flow-ode}
+\end{eqnarray}
+
+在实际应用中，相比随机微分方程方法，采用常微分方程进行采样具有多项优势。首先，给定固定初始噪声向量 $\mathbf{x}(T)$ 时，生成过程是确定性的。因此可以获得唯一的流映射，并能通过正向积分 ODE 将真实样本反演为对应的潜在噪声表示。其次，ODE 的轨迹通常比 SDE 更平滑，可以采用具有自适应步长的常微分方程求解器。第三，利用瞬时变量变换公式，可以计算概率流 ODE 下数据的对数似然。
+
+\textbf{由 Fokker--Planck 方程推导概率流 ODE。}
+
+下面给出概率流 ODE 的详细推导。考虑定义的前向 SDE
+\begin{eqnarray}
+d\mathbf{x}(t) & = & f(\mathbf{x}(t), t) dt + g(t) d\mathbf{w}(t).
+\end{eqnarray}
+其中 $f(\mathbf{x}(t), t)$ 是漂移系数，$g(t)$ 是扩散系数，$\mathbf{w}(t)$ 是标准维纳过程。为简化符号，下文省略 $\mathbf{x}(t)$ 中的参数 $t$。
+
+状态变量 $\mathbf{x}$ 的概率密度函数 $p_t(\mathbf{x})$ 的时间演化由 Fokker--Planck 方程控制：
+\begin{eqnarray}
+\frac{\partial p_t(\mathbf{x})}{\partial t} & = & -\nabla \cdot [f(\mathbf{x}, t) p_t(\mathbf{x})] + \frac{1}{2} g(t)^2 \Delta p_t(\mathbf{x}).
+\label{eq:app-fokker-planck}
+\end{eqnarray}
+其中 $\nabla \cdot$ 表示散度算子，$\Delta = \nabla \cdot \nabla$ 是拉普拉斯算子。等式右边的第一项表示由于漂移引起的概率质量平流，第二项表示由随机噪声引起的扩散。
+
+为了推导等效的 ODE，将方程 \eqref{eq:app-fokker-planck} 重写为连续性方程的形式。连续性方程仅涉及一阶导数，其形式为
+\begin{eqnarray}
+\frac{\partial p_t(\mathbf{x})}{\partial t} & = & -\nabla \cdot [\tilde{f}(\mathbf{x}, t) p_t(\mathbf{x})],
+\label{eq:app-continuity}
+\end{eqnarray}
+其中 $\tilde{f}(\mathbf{x}, t)$ 对应于确定性 ODE 的向量场。
+
+关键步骤是将扩散项 $\Delta p_t(\mathbf{x})$（涉及二阶导数）表示为一阶项的散度。利用恒等式 $\nabla p_t(\mathbf{x}) = p_t(\mathbf{x}) \nabla \log p_t(\mathbf{x})$ 将拉普拉斯算子重写为
+\begin{eqnarray}
+\Delta p_t(\mathbf{x}) & = & \nabla \cdot (\nabla p_t(\mathbf{x})) \nonumber \\
+& = & \nabla \cdot (p_t(\mathbf{x}) \nabla \log p_t(\mathbf{x})).
+\end{eqnarray}
+
+将此恒等式代回 Fokker--Planck 方程 \eqref{eq:app-fokker-planck}，可以将各项组合在单个散度算子下：
+\begin{eqnarray}
+\frac{\partial p_t(\mathbf{x})}{\partial t} & = & -\nabla \cdot [f(\mathbf{x}, t) p_t(\mathbf{x})] + \frac{1}{2} g(t)^2 \nabla \cdot [p_t(\mathbf{x}) \nabla \log p_t(\mathbf{x})] \nonumber \\
+& = & -\nabla \cdot \left[ f(\mathbf{x}, t) p_t(\mathbf{x}) - \frac{1}{2} g(t)^2 p_t(\mathbf{x}) \nabla \log p_t(\mathbf{x}) \right] \nonumber \\
+& = & -\nabla \cdot \left[ \left( f(\mathbf{x}, t) - \frac{1}{2} g(t)^2 \nabla \log p_t(\mathbf{x}) \right) p_t(\mathbf{x}) \right].
+\end{eqnarray}
+
+将此结果与方程 \eqref{eq:app-continuity} 中的连续性方程进行比较，如果将有效的确定性向量场定义为
+\begin{eqnarray}
+\tilde{f}(\mathbf{x}, t) & = & f(\mathbf{x}, t) - \frac{1}{2} g(t)^2 \nabla \log p_t(\mathbf{x}),
+\end{eqnarray}
+则两个方程匹配。因此，该确定性 ODE 产生的边缘分布 $p_t(\mathbf{x})$ 与原始 SDE 定义的随机过程相同，即
+\begin{eqnarray}
+\frac{d\mathbf{x}}{dt} & = & f(\mathbf{x}, t) - \frac{1}{2} g(t)^2 \nabla \log p_t(\mathbf{x}).
+\end{eqnarray}
+
+\subsection{数值采样与高效生成}
+
+无论采用反向 SDE 还是概率流 ODE，训练得到的模型都只提供局部的分数或向量场，
+最终样本仍需通过数值求解逐步累积这些局部变化。
+离散步数过少会放大求解误差，步数过多又会增加神经网络评估成本。
+因此，本小节将从求解格式、步长选择和轨迹形状三个方面讨论采样效率，
+并说明高阶或专用求解器、预测--校正以及轨迹简化方法如何在速度与精度之间取得平衡。
+
+\textbf{反向 SDE 的数值求解。}
+
+为了从训练好的扩散模型中生成样本，需要从初始样本 $\mathbf{x}(T) \sim p_T$ 出发，逆向模拟反向时间 SDE（式 \eqref{eq:backward-sde}）直至 $t=0$。由于复杂数据分布通常无法获得闭式解，需要采用数值求解器来近似连续轨迹。
+
+最基础且广泛使用的方法是 Euler--Maruyama 方法，该方法将欧拉法推广至 SDE 情形。首先将时间区间 $[0, T]$ 离散化为 $N$ 步：$t_N = T > t_{N-1} > \dots > t_0 = 0$。对于正的步长 $\Delta t = t_{i+1} - t_i$，从 $t_{i+1}$ 到 $t_i$ 的反向 SDE 可通过下式近似：
+\begin{align}
+\mathbf{x}_{t_i} &\approx \mathbf{x}_{t_{i+1}}
+- \left[ f(\mathbf{x}_{t_{i+1}}, t_{i+1})
+- g(t_{i+1})^2 s_\theta(\mathbf{x}_{t_{i+1}}, t_{i+1}) \right] \Delta t
++ g(t_{i+1}) \sqrt{\Delta t} \, \boldsymbol{\epsilon}_{i+1}.
+\label{eq:reverse-em}
+\end{align}
+
+\noindent 其中 $\boldsymbol{\epsilon}_{i+1}\sim\mathcal{N}(\mathbf{0},\mathbf{I})$。
+需要注意的是，由于这里进行的是时间逆向积分，数值求解器中的计算步骤对应于物理时间 $t$ 的负增量。将 Euler--Maruyama 离散化应用于反向 VP SDE，可得到与离散扩散模型采样规则相联系的更新形式。
+
+SDE 框架的一个优势在于能够将数值积分与\textbf{马尔可夫链蒙特卡洛}（MCMC）方法结合。例如，通过使用预测--校正方法，可将数值离散化与基于分数的校正解耦。在预测步骤中，数值求解器根据当前状态 $\mathbf{x}_{t_{i+1}}$ 估计下一时间步 $\mathbf{x}_{t_i}$ 的状态，该步骤使过程沿时间逆向演化。在预测步骤之后，对 $\mathbf{x}_{t_i}$ 应用 MCMC 方法（如朗之万动力学）进行多次迭代。分数函数 $s_\theta(\mathbf{x}_{t_i}, t_i)$ 提供分布 $p_{t_i}$ 的对数密度梯度，因此运行朗之万动力学可将预测样本推向边缘分布 $p_{t_i}$ 的高密度区域，同时保持时间 $t_i$ 不变。
+
+\textbf{与流匹配路径的比较。}
+
+虽然从随机微分方程导出的概率流 ODE 提供了确定性的生成过程，但它本质上是随机扩散过程的副产品。方程 \eqref{eq:probability-flow-ode} 中的向量场
+\[
+f(\mathbf{x}(t), t)-\frac{1}{2}g(t)^2
+\nabla_{\mathbf{x}(t)}\log p_t(\mathbf{x}(t))
+\]
+由前向扩散 SDE（例如方差爆炸或方差保持）的具体选择决定。这引发了一个问题：能否直接学习概率流 ODE 的向量场，而不依赖于中间的扩散公式？此外，能否设计这个向量场使其具有更直的轨迹，从而更容易进行数值积分？
+
+这催生了流匹配框架。流匹配是一种无模拟训练连续归一化流的方法，它允许灵活地定义概率路径。其核心思想是直接用一个神经网络向量场 $v(\mathbf{x}(t), \theta, t)$（或 $v_{\theta}(\mathbf{x}(t), t)$）去回归一个能够生成期望概率路径 $p_t(\mathbf{x}(t))$ 的目标向量场 $u_t(\mathbf{x}(t))$。基于流匹配的方法与基于分数的方法可作如下比较：
+\begin{itemize}
+\item \textbf{基于分数的方法。}前向过程是一个固定的高斯扩散过程。对应的概率流 ODE 具有一个由漂移项和分数项组成的向量场。由此产生的轨迹通常较为弯曲，因为扩散过程按照固定的调度破坏信息。因此，求解反向 ODE 往往需要较多步数或专用求解器来精确追踪这些路径。
+\item \textbf{流匹配方法。}与由随机微分方程决定动力学不同，流匹配允许直接设计路径。两点之间最简单的传输映射是一条直线；对于给定端点对，沿线性插值路径的条件向量场在时间上为常数。这样的 ODE 通常更容易数值求解。
+\end{itemize}
+
+图~\ref{fig:fm-vs-diffusion} 从轨迹几何和数值离散的角度概括了上述差异。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-flow-matching-vs-diffusion}
+\caption{从先验噪声分布 $p_T$ 到数据分布 $p_0$ 的生成轨迹对比。基于分数的方法经由扩散过程确定概率路径；流匹配则允许显式设计条件路径。}
+\label{fig:fm-vs-diffusion}
+\end{figure}
+
+\textbf{高阶与专用求解器。}
+
+将扩散模型部署到实际应用中的一个瓶颈是其在推理阶段的高计算成本。提高生成效率的方法包括高阶数值求解器、轨迹修正和一致性模型。
+
+最直接的加速方法之一是采用高阶数值求解器。当轨迹弯曲时，像一阶欧拉法这样的标准求解器需要许多步才能减小离散化误差。为了解决这个问题，可以利用扩散 ODE 特有的数学结构构造高阶求解器。
+
+例如，DPM-Solver 和 DPM-Solver++ 利用扩散 ODE 的半线性结构来解析计算解的线性部分，从而将非线性部分简化为指数加权积分。其核心原理在于常数变易公式，该公式将 ODE 分离为线性漂移项和非线性的分数项。通过解析求解线性部分，求解器只需使用 $(k-1)$ 阶多项式来近似非线性分数函数。DPM-Solver++ 通过使用数据预测参数化和动态阈值处理来防止解漂移到有效数据范围之外，从而进一步提高稳定性。DPM-Solver-v3 则采用预测器--校正器框架，通过内部预测步骤细化积分近似，并结合由经验模型统计确定的系数改善少步采样。
+
+除了上述方法，还可从几何和数学结构出发设计求解器。近似平均方向求解器（AMED-Solver）利用采样轨迹通常位于低维子空间这一观察，通过学习预测流的平均方向减少求解步数。扩散指数积分采样器（DEIS）在变换后的对数 $\rho$ 空间中拟合多项式，以减小离散化误差。统一预测器--校正器方法（UniPC）引入校正步骤并重用预测器中已经评估过的噪声预测，从而在不增加神经函数评估的情况下提高精度阶数。扩散模型的伪数值方法（PNDM）将去噪过程视为在数据高密度区域对应的流形上求解微分方程，并将数值步骤分解为梯度部分和非线性转移部分。此外，阐明扩散模型（EDM）使用二阶 Heun 求解器，并通过将网络输入、输出和损失缩放到单位方差来稳定训练动态。
+
+\textbf{轨迹修正。}
+
+流匹配旨在学习一个向量场 $v_\theta(\mathbf{x}(t), t)$，该向量场能够诱导一个概率流，从而将简单的先验分布 $p_T$ 转换为复杂的数据分布 $p_0$。其核心目标是最小化学到的速度场与将样本沿选定路径传输的真实条件速度之间的差异。然而，实际轨迹还受到数据分布 $p_0$ 与噪声分布 $p_T$ 之间耦合方式的影响。
+
+在初始训练阶段，通常称为 1-修正流，数据点 $\mathbf{x}(0)$ 和噪声点 $\mathbf{x}(T)$ 从其各自的分布中随机配对。这种随机配对导致高维潜在空间中的条件轨迹经常相交。当多条直线轨迹在时空中的同一点 $\mathbf{x}(t)$ 相交时，学到的边缘向量场 $v_\theta(\mathbf{x}(t), t)$（即这些不同相交速度的期望）会变得弯曲。因此，在积分 ODE 时实际遵循的路径不再是直的，这会使采用大步长时产生更多离散化误差。
+
+在修正流框架中，可以通过减少条件路径之间的干扰来改善噪声分布与数据分布之间的耦合。首先，使用随机配对 $(\mathbf{x}(0), \mathbf{x}(T))$ 训练一个 1-修正流 $v_{\theta}^1$。然后，使用训练好的模型 $v_{\theta}^1$ 生成一个新的合成数据集。具体来说，对于一组噪声样本 $\{\mathbf{x}_i(T)\}$，沿物理时间 $t$ 从 $T$ 反向积分 ODE
+\[
+\frac{d\mathbf{x}(t)}{dt}=v_{\theta}^1(\mathbf{x}(t),t)
+\]
+以获得对应的生成数据样本 $\{\hat{\mathbf{x}}_i(0)\}$。
+等价地，若引入递增的反向时间 $\tau=T-t$，则该方程写为
+$d\mathbf{x}/d\tau=-v_{\theta}^1(\mathbf{x},T-\tau)$。
+这样就创建了一组确定性的、重新连接的样本对
+$(\hat{\mathbf{x}}_i(0), \mathbf{x}_i(T))$。最后，使用这些对齐的样本对训练新模型
+$v_{\theta}^2$，即 2-修正流。由于 $\hat{\mathbf{x}}_i(0)$ 是通过第一个模型的动力学
+从 $\mathbf{x}_i(T)$ 生成的，这些潜在空间中的样本对高度对齐，因此得到的向量场更加线性。
+
+轨迹的直线性还与学到的向量场的 Lipschitz 常数有关。如果 1-修正流是 $L$-Lipschitz 的，则可以防止附近的噪声样本映射到任意远的数据点。然而，在实践中，$L$ 可能很大，导致在生成的早期阶段传输路径出现显著弯曲。这种弯曲会降低一步欧拉采样的精度，可能需要进一步修正或采用更合适的采样调度。
+
+为了进一步提高效率和稳定性，也可以将分治策略应用于修正流。例如，分段修正流（PeRFlow）将生成轨迹划分为几个离散的时间窗口。它不是拉直全局流，而是分别拉直每个区间内的轨迹片段；这种局部化降低了模拟训练轨迹的计算成本，并减小数值误差。
+
+\textbf{一致性模型。}
+
+一致性建模代表了一种从迭代积分转向直接映射的方法。不同于沿轨迹路径逐步求解，一致性模型旨在学习一个函数，该函数能够将概率流 ODE 轨迹上任意时间步的任意点直接映射至其原点。这种自一致性要求同一条路径上的所有点生成相同的输出，因此可以通过单步或少步生成获得样本。
+
+一致性模型通常通过两种机制训练：一致性训练与一致性蒸馏。虽然一致性训练支持从零开始训练，但一致性蒸馏可以把预训练扩散模型（教师模型）的多步轨迹提炼至一致性模型（学生模型）。蒸馏损失通过最小化学生模型在当前时间步 $t$ 的预测与相邻时间步预测之间的差异，将教师模型的多步轨迹压缩为较少的直接跳跃。
+
+潜在一致性模型（LCM）将一致性蒸馏应用于高分辨率图像合成模型的潜在空间。通过提炼潜在 ODE 的概率流，LCM 在保持母模型生成能力的同时降低推理延迟。为缓解重训练大型骨干网络的计算开销，LCM-LoRA 进一步采用参数高效的微调策略，训练轻量级低秩自适应模块作为加速器。
+
+随着采样步数增加，早期一致性模型的生成质量可能下降。轨迹一致性蒸馏（TCD）受指数积分器启发，在半线性框架中重构一致性函数，以支持对任意中间步骤的映射；分阶段一致性模型（PCM）则将轨迹划分为多个子轨迹，从而在避免随机误差累积的前提下实现确定性多步采样。
+
+需注意的是，虽然一致性模型针对单步生成进行了优化，但它们同样支持多步一致性采样。通过执行少量采样步并对中间输出重新编码，模型可以迭代修正离散化误差，从而在推理速度与样本保真度之间提供灵活的权衡。
+
+\begin{exercisebox}
+  \begin{enumerate}
+    \item 对伊藤 SDE \(\mathrm d\boldsymbol x=f(\boldsymbol x,t)\,\mathrm dt+g(t)\,\mathrm d\boldsymbol w\)，分别说明漂移、扩散系数和布朗增量的作用。它与 ODE 的样本轨迹有何根本区别？
+    \item 某二维 SDE 在短时间 \(\Delta t=0.01\) 内的漂移为 \((1,-2)^\top\)，扩散系数为 \(3\)。求 Euler--Maruyama 单步增量的均值、协方差矩阵和每个坐标随机部分的标准差。
+    \item 若 \(p_t(\boldsymbol x)=\mathcal N(\boldsymbol\mu,\sigma^2\boldsymbol I)\)，求其分数函数，并解释分数向量的几何方向以及它在反向 SDE 中的作用。
+    \item 去噪分数匹配为什么能够使用可计算的条件分数来学习未知的边缘分数？请结合高斯扰动写出常用的条件分数监督目标。
+    \item 写出前向 SDE 对应的反向 SDE 与概率流 ODE，并说明二者“具有相同边缘分布”不等于“具有相同样本路径”。在采样、反演和似然计算方面它们各有什么特点？
+  \end{enumerate}
+\end{exercisebox}
+
+\section{离散状态上的连续时间动力学}
+\label{sec:diffusion-models-in-language}
+
+前两节讨论的确定性与随机概率动力学都建立在连续状态空间上：
+无论样本由 ODE 还是 SDE 驱动，状态都能够在向量空间中作无穷小变化。
+现在转向另一类情形：时间变量仍然连续，但系统状态取自离散集合。
+对于文本词元、类别标签等对象，两个离散状态之间通常不存在可直接解释为有效样本的连续中间值；
+相应的样本轨迹不再沿光滑曲线移动，而是在连续时间中以随机时刻发生离散跳转。
+连续时间马尔可夫链及其生成器正是刻画这类动力学的基本工具。
+
+语言生成同时提供了连接连续与离散方法的典型场景。一种做法是先把词元映射到连续嵌入空间，
+再沿用连续扩散模型；另一种做法则直接在词元空间定义破坏、去噪和跳转过程。
+为说明这两条路线如何与前文的概率动力学相衔接，下面先区分自回归与非自回归序列生成，
+随后依次讨论嵌入空间扩散、连续时间马尔可夫链、离散扩散、掩码扩散以及相关的连续松弛与流方法。
+
+\begin{importantnote}
+\textbf{新概念：}连续时间马尔可夫链的时间变量连续、状态空间离散。生成器矩阵的非对角元素给出状态间的瞬时跳转率，对角元素保证每行和为零；它在离散状态空间中承担了类似连续向量场的角色，并诱导概率分布满足主方程。
+
+\textbf{重难点解析：}嵌入扩散在连续向量空间中加噪，便于复用 SDE 和分数模型，但最终需要舍入为词元，可能出现表示平均化和长度处理问题；离散扩散直接在词元空间定义替换或掩码跳转，语义对象始终合法，却需要设计可处理的转移核与反向过程。扩散式 NAR 可以并行更新位置，但仍需多次去噪，不能把完整生成复杂度简单视为 \(O(1)\)。
+\end{importantnote}
+
+\subsection{令牌序列生成}
+
+我们首先介绍\textbf{自回归（AR）生成}和\textbf{非自回归（NAR）生成}的概念，随后说明扩散模型如何采用 NAR 式的并行位置更新。
+\subsubsection{自回归生成与非自回归生成}
+
+\textbf{令牌序列生成}（简称\textbf{序列生成}）是自然语言处理中的基础任务，也是\textbf{大语言模型}（LLMs）的基石\citep{radford-etal:2018improving}。主流方法是自回归（AR）生成\footnote{统计学中，\textit{回归}指估计因变量（$Y$）与自变量（$X$）的关系。前缀\textit{auto}源自希腊语"自我"，因此\textit{自回归}表示用变量自身的滞后值作为自变量进行回归分析。即不通过$X$预测$Y$，而是用$Y_{\text{昨日}}$预测$Y_{\text{今日}}$}。自然语言处理中通常采用从左到右的生成方式，即根据已生成的所有前序令牌逐个预测后续令牌。形式化地，设$\mathbf{x} = \{x_1,...,x_n\}$为令牌序列，其概率通过概率链式法则定义为：
+\begin{eqnarray}
+\Pr(\mathbf{x}) & = & \Pr(x_1,...,x_n) \nonumber \\
+& = & \prod_{i=1}^{n} \Pr(x_i|x_{<i}).
+\end{eqnarray}
+
+\noindent 其中$x_i$表示当前步生成的令牌，$x_{<i}$表示所有已生成的前序令牌。$\Pr(x_i|x_{<i})$是下一令牌的条件概率，体现了从左到右生成的本质。实现$\Pr(x_i|x_{<i})$的方式多样，常用方法是使用神经网络建模该概率，例如LSTM和Transformer都是神经语言建模中的经典架构。
+
+多数文本生成任务需要基于用户提供的上下文信息进行条件生成。我们将这类上下文信息记为$\mathbf{c}$，可广义视为变量序列$\mathbf{c} = \{c_1,...,c_m\}$。此时生成任务转化为建模给定$\mathbf{c}$时目标序列$\mathbf{x}$的概率：
+\begin{eqnarray}
+\Pr(\mathbf{x}|\mathbf{c}) & = & \prod_{i=1}^{n} \Pr(x_i|x_{<i},\mathbf{c}).
+\end{eqnarray}
+
+\noindent 此处$\mathbf{c}$可以是离散令牌序列（如提示词）或实值向量序列（如神经网络生成的表示）。通常$\mathbf{c}$可根据具体任务定义，例如在翻译中作为源语句，在问答中作为提示词，或作为外部记忆中的历史表示。
+
+自回归生成的核心优势在于其简洁性，由此衍生出多项优良特性：既符合人类语言产出的认知过程，也适合对话、叙事等任务；还能自然处理变长序列——模型持续生成直至输出序列结束符（EOS），而非填充固定长度模板。但自回归方式长期受学界诟病的缺点包括：生成速度慢，由于第$i$步依赖第$i-1$步，无法并行生成，导致100个令牌的句子需顺序执行100次前向计算，实时应用计算成本高；上下文视野受限，预测$x_i$时仅能观测左侧上下文$x_{<i}$，无法前瞻右侧语义。
+
+非自回归（NAR）生成通过打破序列依赖链提供替代方案\citep{gu-etal:2018non}。与逐个生成词元不同，非自回归模型并行地生成序列中的所有词元。对于最简单的单步 NAR 模型，通常假设目标词元在给定输入条件下相互独立。此时，序列 $\mathbf{x}$ 的概率可分解为：
+\begin{eqnarray}
+\Pr(\mathbf{x}|\mathbf{c}) & = & \prod_{i=1}^{n} \Pr(x_i|\mathbf{c})
+\end{eqnarray}
+
+在这种形式中，词元 $x_i$ 的预测不依赖于其他目标词元 $x_{j}$（$j \neq i$）。因此，非自回归生成具有高效的推理性能。通过解耦词元之间的依赖关系，模型可以在单次前向传播中预测整个序列，从而将相对于序列长度的串行深度从 $O(n)$ 减少到 $O(1)$。这里的 $O(1)$ 只描述一次并行生成或更新；扩散式 NAR 模型仍需执行多个去噪时间步，其总采样深度并不是关于扩散步数的 $O(1)$。同时，多步模型可以借助不断更新的全序列状态表达位置间依赖，并不等同于始终采用上述一次性乘积分布。这种并行性使得现代 GPU 能够得到更高效的利用，因此对于延迟要求苛刻的实时应用而言，非自回归模型具有很大吸引力。此外，非自回归模型在生成过程中可以充分利用过去和未来位置的信息。图 \ref{fig:ar-vs-nar-generation} 展示了自回归生成与非自回归生成之间的区别。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-ar-vs-nar-generation}
+\caption{自回归生成与非自回归生成对比。$\mathbf{c} = {c_1,c_2}$ 表示用户提供的上下文，$\mathbf{x}={x_1,x_2,x_3,x_4}$ 表示目标序列。我们的目标是对给定 $\mathbf{c}$ 条件下 $\mathbf{x}$ 的概率进行建模。(a) 在自回归生成中，词元按序预测，$x_i$ 的预测依赖于历史信息 $\mathbf{x}_{<i}$ 和 $\mathbf{c}$。(b) 在非自回归生成中，序列中的所有词元并行预测。图 (b) 中的虚线表示一个由 4 个掩码词元组成的模板（给定目标长度时）。}
+\label{fig:ar-vs-nar-generation}
+\end{figure}
+
+然而需要指出的是，条件独立性假设也存在局限性。例如，在自然语言中，一个句子往往存在多种有效的补全方式。非自回归模型由于无法知晓其他位置已选择了哪些词元，可能会混合不同的有效模式，从而导致所谓的多峰性问题\footnote{此问题可能导致重复、遗漏或语法不连贯，例如当有效实体为“New York”或“London”时，模型却可能在位置 $i$ 选择“New”，在位置 $i+1$ 选择“London”。}。
+
+\subsubsection{扩散建模作为非自回归生成}
+
+尽管存在上述限制，非自回归生成的并行位置更新仍与扩散模型通常同时处理全部数据维度的方式相适应。因此，自然语言处理中的许多扩散模型采用 NAR 式的生成范式。为了理解这种联系，将非自回归生成的概念推广到单步预测之外是有帮助的。让我们将生成过程重新想象为一个随时间 $t$ 演化的动力系统。我们将 $\mathbf{s}(t)$ 定义为系统在时间 $t$ 的中间状态。这个抽象状态 $\mathbf{s}(t)$ 作为一个统一的表示：它既可以是一系列离散变量（例如，被破坏的标记），也可以是一系列连续向量（例如，标记嵌入）。在生成过程中，系统从 $t=T$ 到 $t=0$ 在时间上反向演化。该系统的状态定义如下
+
+\begin{itemize}
+\item 起始点 $\mathbf{s}(T)$。这表示从先验分布（例如高斯噪声向量或完全随机的标记）中抽取的样本。它不包含任何语义信息。
+\item 中间状态 $\mathbf{s}(t)$（当 $0 < t < T$ 时）。这些状态表示不断演化的潜在变量。它们可视为目标数据的带噪近似。
+\item 终止点 $\mathbf{s}(0)$。状态 $\mathbf{s}(0)$ 表示完全去噪后的信号。最终，通过确定性或随机性映射（例如取整或 argmax 操作）将 $\mathbf{s}(0)$ 投影回有效的标记序列 $\mathbf{x} = \{x_1, \dots, x_n\}$。
+\end{itemize}
+
+在这个过程中，我们需要将条件 $\mathbf{c}$ 合并到每个状态 $\mathbf{s}(t)$ 中，以形成联合状态 $(\mathbf{s}(t), \mathbf{c})$。因此，演化可以描述为
+\begin{equation}
+(\mathbf{s}(T), \mathbf{c}) \to \cdots \to (\mathbf{s}(t), \mathbf{c}) \to \cdots \to (\mathbf{s}(0), \mathbf{c}) \to \mathbf{x}.
+\end{equation}
+
+最终的映射 $(\mathbf{s}(0), \mathbf{c}) \to \mathbf{x}$ 通常通过使用一个单独的系统来执行（例如，将嵌入映射到标记）。步骤 $(\mathbf{s}(T), \mathbf{c}) \to \cdots \to (\mathbf{s}(t), \mathbf{c}) \to \cdots \to (\mathbf{s}(0), \mathbf{c})$ 可以被视为一个动力系统的演化，就像标准扩散模型中那样。这个过程如图 \ref{fig:diffiusion-modeling-as-nar-generation} 所示。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-diffiusion-modeling-as-nar-generation}
+\caption{基于扩散模型的非自回归生成示意图。生成过程被建模为状态$\mathbf{s}(t)$随时间$t$的演化过程。其中$\mathbf{s}(T)$表示起始点（先验分布），$\mathbf{s}(0)$表示终点（完全去噪信号）。上下文信息$\mathbf{c}$在生成过程中被注入状态变量。最终输出是从$\mathbf{s}(0)$映射得到的词元序列。}
+\label{fig:diffiusion-modeling-as-nar-generation}
+\end{figure}
+
+在本节的剩余部分，我们将使用扩散模型作为实现非自回归生成的工具。我们根据它们如何定义动力系统 $\mathbf{s}(t)$ 的状态空间对这些方法进行分类。我们首先介绍嵌入空间扩散，它将标记映射到连续向量以应用连续高斯扩散。然后我们讨论离散扩散，它直接在离散标记上定义破坏和去噪过程。
+\subsection{连续空间中的扩散：嵌入空间扩散}
+
+在本小节中，我们介绍嵌入空间扩散框架，该框架将连续扩散模型适配于词元序列生成。
+
+\subsubsection{通用框架}
+
+将扩散模型应用于文本的一种直观方法是，将离散词元映射到连续嵌入空间 $\mathbb{R}^d$ 中，从而使扩散和生成过程可以在连续域中进行。几项重要工作都基于这种嵌入空间扩散框架 \citep{li-etal:2022diffusion,strudel-etal:2022self,gong-etal:2023diffuseq}。在这些方法中，第一步是将序列中的每个词元转换为一个 $d$ 维实值向量（称为词元嵌入）。形式上，令 $V$ 为一个大小为 $|V|$ 的词表。每个词元 $x \in V$ 通常表示为一个独热向量，并投影为一个稠密向量。然后，一个词元序列 $\mathbf{x} = \{x_1, \dots, x_n\}$ 可以通过一个嵌入函数 $\mathrm{Embed}(\cdot)$ 映射为一个连续向量序列，如下所示：
+\begin{eqnarray}
+\mathrm{Embed}(\mathbf{x}) & = & [\mathbf{e}_1,\dots,\mathbf{e}_n], \nonumber \\
+& = & \mathbf{e}
+\end{eqnarray}
+
+\noindent 其中 $\mathbf{e}_i \in \mathbb{R}^d$ 表示位置 $i$ 处的嵌入，$\mathbf{e} \in \mathbb{R}^{d \times n}$ 表示嵌入序列（堆叠为矩阵）。同样，我们可以将上下文词元序列 $\mathbf{c}$ 转换为嵌入序列 $\mathbf{e}_{c} \in \mathbb{R}^{d \times n_c}$。
+
+定义 $\mathrm{Embed}(\cdot)$ 的一种简单方法是使用一个静态嵌入矩阵 $\mathbf{E} \in \mathbb{R}^{d \times |V|}$ \citep{mikolov-etal:2013efficient,mikolov-etal:2013distributed}。这种方法虽然简单，但将词元视为独立单元，从而忽略了它们在序列中的上下文依赖关系。或者，可以将整个词元序列映射到一个上下文化表示序列中。例如，可以使用预训练的大语言模型来编码词元及其周围的上下文 \citep{devlin-etal:2019bert,brown-etal:2020language}。请注意，这种变换不限于词元与向量之间的一一对应关系，也不受限于固定的序列长度 $n$。相反，我们可以使用更高层次的抽象将词元序列映射到一个不同长度 $n'$ 的潜在连续序列（其中 $n'$ 不必等于 $n$）。例如，通过使用变分自编码器，可以将离散序列压缩为更稠密、语义更丰富的潜在表示。在这种潜在扩散范式 \citep{rombach-etal:2022high} 中，扩散过程作用于这些压缩后的潜在变量，而不是原始的词元嵌入。
+
+一旦词元被表示为嵌入，生成问题就可以用标准方式通过扩散模型来形式化。形式上，令 $\mathbf{e}_c$ 为上下文嵌入序列。我们定义 $\bar{\mathbf{s}}(t)$ 为结合了 $\mathbf{e}_c$ 和 $\mathbf{s}(t)$ 的增广状态：
+\begin{eqnarray}
+\bar{\mathbf{s}}(t) & = & [\mathbf{e}_c, \mathbf{s}(t)].
+\end{eqnarray}
+
+我们将 $\mathbf{e}_c$ 和 $\mathbf{e}$ 的拼接视为连续扩散过程的初始状态 $\bar{\mathbf{s}}(0) = [\mathbf{e}_c,\mathbf{e}] \in \mathbb{R}^{d \times (n_c + n)}$。然后，我们定义一个前向过程，在时间 $t \in [0, T]$ 内逐渐向目标嵌入添加高斯噪声，同时保持上下文嵌入固定。它将有意义的词元嵌入转换为标准高斯噪声 $\mathcal{N}(\mathbf{0}, \mathbf{I})$。
+
+如前所述，有几种模型可供选择。例如，可以用随机微分方程描述目标嵌入的扩散过程，而把上下文嵌入作为固定条件：
+\begin{eqnarray}
+d\mathbf{e}_c & = & 0, \nonumber\\
+d \mathbf{s}(t) & = & f(\mathbf{s}(t),\mathbf{e}_c,t) d t + g(t) d\mathbf{w}.
+\label{eq:diffusion-embedding}\label{eq:diffusion-embedding-nobar}
+\end{eqnarray}
+
+\noindent 其中 $f(\mathbf{s}(t),\mathbf{e}_c,t)$ 是漂移系数，$g(t)$ 是扩散系数，$\mathbf{w}$ 是标准维纳过程。生成过程对应于条件反向时间随机微分方程，它从目标序列部分为高斯噪声的状态 $\bar{\mathbf{s}}(T)=[\mathbf{e}_c,\mathbf{s}(T)]$ 重建目标嵌入：
+\begin{eqnarray}
+d \mathbf{s}(t) & = & \left[f(\mathbf{s}(t),\mathbf{e}_c,t)-g(t)^2\nabla_{\mathbf{s}(t)}
+\log p_t(\mathbf{s}(t)\mid\mathbf{e}_c)\right]dt+g(t)d\bar{\mathbf{w}}.
+\label{eq:generation-embedding}\label{eq:generation-embedding-nobar}
+\end{eqnarray}
+
+\noindent 其中 $\bar{\mathbf{w}}$ 是反向时间维纳过程，$\nabla_{\mathbf{s}(t)}\log p_t(\mathbf{s}(t)\mid\mathbf{e}_c)$ 是给定上下文嵌入后的条件得分函数。也可以使用流匹配来学习以 $\mathbf{e}_c$ 为条件的向量场，将目标部分的分布从高斯噪声推送到数据分布。这些方法的详细讨论在此省略，相关的连续扩散模型已在前面的随机概率动力学一节中讨论。
+
+与计算机视觉模型的一个关键区别在于，在自然语言处理中，我们通常使用 Transformer 作为学习得分函数或向量场的主干架构。给定增广状态 $\bar{\mathbf{s}}(t) = [\mathbf{e}_c, \mathbf{s}(t)] \in \mathbb{R}^{d \times (n_c + n)}$，Transformer 可以读取上下文块和目标块，但只有与目标序列对应的输出块用于估计条件得分或向量场，上下文块本身不参与扩散更新，如图 \ref{fig:transformer-based-generation-process} 所示。与图像生成（其空间维度通常是固定的）不同，自然语言序列的长度本质上是可变的。因此，我们需要在推理过程中确定目标序列长度 $n$。此外，尽管扩散和生成过程在连续空间中进行以获得 $\mathbf{s}(0)$，但目标是产生离散词元。因此，需要一个额外的模块将生成的连续嵌入解码回离散词元。我们将在下面简要讨论这两个挑战。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-transformer-based-generation-process}
+\caption{基于Transformer的生成过程示意图。生成（即反向扩散）过程从目标序列的标准高斯噪声初始化状态$\bar{\mathbf{s}}(T)$开始。在每个时间步$t$，状态$\bar{\mathbf{s}}(t)$表示上下文嵌入与含噪目标嵌入的拼接。Transformer模型基于$\bar{\mathbf{s}}(t)$估计得分函数（或向量场），随后用于将状态更新至$\bar{\mathbf{s}}(t-\Delta t)$。该迭代过程持续进行直至达到干净状态$\bar{\mathbf{s}}(0)$，最终被解码为离散标记。注意上下文嵌入$\mathbf{e}_c$在更新过程中保持固定。}
+\label{fig:transformer-based-generation-process}
+\end{figure}
+\subsubsection{长度预测}
+
+长度预测是自然语言处理中一个反复出现的问题，已有悠久的研究历史。一种直接的方法是根据上下文明确预测目标序列的长度。例如，可以通过将源长度乘以特定比率来简单地推导目标长度。这一概念可以追溯到\textbf{统计机器翻译}（SMT）的早期，当时使用繁衍模型来确定与单个源词对应的目标词数量 \citep{brown-etal:1993mathematics}。在非自回归生成模型的发展过程中也采用了类似的机制 \citep{xiao-etal:2023survey}。在早期的非自回归生成模型（通常是编码器-解码器架构）中，编码器中集成了一个繁衍预测器。该预测器估计每个编码器隐藏状态应被复制到解码器的次数，从而在解码之前规划目标序列长度。在这类方法中，长度预测被构建为对概率 $\Pr(n|\mathbf{c})$ 进行建模。预测器通常是一个神经网络，例如\textbf{多层感知机}（MLP），其训练目标是最大化给定上下文条件下真实长度的似然。在推理过程中，通过选择概率最高的长度 $n^*$ 来确定目标长度。
+
+显式长度预测方法简单，但常常导致重复和幻觉，因为模型会试图用无意义或冗余的令牌来填充预分配窗口中未使用的容量。相反，当前大多数扩散语言模型采用隐式长度确定方法。这种方法与自回归生成的行为一致，允许模型自行发出终止信号。在实践中，生成过程从一个足够长的窗口（例如，最大序列长度）开始。一旦该过程完成，并且连续嵌入已被解码为离散令牌，系统会识别第一个终止标记（如 EOS 令牌）的出现位置。该位置被视为句子的逻辑结尾，其后的所有令牌都将被丢弃。
+
+最近的研究也通过引入动态长度适应机制，解决了预分配最大长度窗口带来的计算效率低下的问题 \citep{li-etal:2025fixed,yang-etal:2025diffusion}。这些方法不依赖于仅通过 EOS 令牌进行事后截断，而是将长度调制直接集成到扩散和生成过程中。通过离散的插入和删除操作或灵活的去噪调度，它们可以动态调整序列长度。
+\subsubsection{舍入}
+
+如上所述，生成过程在 $t=0$ 时终止，产生一个连续向量序列 $\mathbf{s}(0)$。我们将 $\bar{\mathbf{s}}(0)$ 内生成的嵌入序列表示为 $\hat{\mathbf{e}} = [\hat{\mathbf{e}}_1, \dots, \hat{\mathbf{e}}_n]$，其中每个 $\hat{\mathbf{e}}_i \in \mathbb{R}^d$。由于我们的目标是生成文本，必须将这些连续向量映射回词汇表 $V$ 中的离散词元。此操作通常被称为 \textbf{舍入} 或解码。
+
+最直接的舍入方法是 \textbf{最近邻搜索}。假设我们使用预训练的嵌入矩阵 $\mathbf{E} \in \mathbb{R}^{d \times |V|}$ 来表示词元嵌入，其中每一列对应一个词元 $v \in V$ 的嵌入。那么，我们可以选择在特定距离度量下，其嵌入与生成的向量 $\hat{\mathbf{e}}_i$ 最接近的词元。由于扩散模型通常使用 MSE 损失进行训练，欧几里得距离是一个自然的选择
+\begin{eqnarray}
+x_i & = & \underset{v \in V}{\arg\min} \ \|\hat{\mathbf{e}}_i - \mathbf{e}_v\|_2^2,
+\end{eqnarray}
+
+\noindent 其中 $\mathbf{e}_v$ 表示 $\mathbf{E}$ 中对应词元 $v$ 的列。或者，也可以采用可训练的投影层后接 softmax 函数，类似于标准自回归语言模型中的输出层。在这种情况下，词元 $x_i$ 的概率由 Softmax 函数给出。
+
+相比之下，对于基于潜在或上下文嵌入的模型（例如使用 VAE 或 LLM 表示的模型），简单的最近邻搜索不适用，因为生成的潜在变量并不直接对应静态的词元嵌入。在这些方法中，需要一个可学习的解码器将连续的潜在序列映射回离散的词元空间。解码过程通常涉及一个神经网络，该网络为每个潜在向量预测词汇表上的概率分布，如同自回归生成模型一样。
+
+舍入并非易事，这源于连续扩散潜在空间与词元嵌入的离散性质之间的不匹配。标准的扩散训练目标（如 MSE）鼓励模型预测数据的期望值。在语言的上下文中，如果分布是多模态的（例如，下一个词元可能是“猫”或“狗”），模型可能会预测它们嵌入的平均值：$(\mathbf{e}_{\text{猫}} + \mathbf{e}_{\text{狗}})/2$。这个平均向量位于有效嵌入之间的间隙空间中。简单地将此向量舍入到最近邻，可能会导致一个语义宽泛的词元（例如“动物”），或者如果嵌入空间不是完全平滑的，则可能导致一个完全不相关的词元。这种现象通常表现为生成的向量未能承诺于一个特定的离散模式。
+
+为了缓解这个问题，研究人员引入了辅助目标和架构修改。\citet{li-etal:2022diffusion} 提出了一个可训练的舍入参数，并向训练目标中添加了一个辅助正则化项。该项明确鼓励模型生成接近 $\mathbf{E}$ 中有效嵌入的向量，从而减少推理过程中的舍入误差。\citet{strudel-etal:2022self} 引入了自条件的概念，即将去噪词元的估计值投影回嵌入空间，并用作下一步的输入。这有效地将中间状态钳制在更接近有效数据流形的位置，并使最终状态 $\mathbf{s}(0)$ 能够可靠地映射到离散词元。
+\subsection{词元空间中的扩散：离散扩散}
+
+虽然嵌入空间中的扩散能很好地融入标准扩散模型的框架，但它引入了将连续向量舍入回离散词元的非平凡挑战。为了规避这一问题，并使生成过程更自然地与语言的离散特性对齐，越来越多的研究开始探索离散扩散。在这一范式中，污染过程直接在离散词汇空间 $V$ 上进行操作，从而消除了对嵌入投影和舍入的需求。
+\subsubsection{CTMC 视角}
+\label{sec:the-ctmc-perspective}
+
+为了直接在离散词汇表 $V$ 上建模扩散和生成过程，我们摒弃了连续空间中常用的高斯噪声和随机微分方程（SDE）。在离散状态空间中，过程在连续时间内演化，但仅通过瞬时跳跃改变状态：它保持恒定一段随机停留时间，然后跳转到一个新状态。自然描述这种概率跳跃的数学框架是连续时间马尔可夫链（CTMC）。正如 SDE 框架将扩散视为步长趋近于零时随机游走的极限，CTMC 框架将离散扩散视为时间步数趋近于无穷时离散时间马尔可夫链的极限。
+
+由于此处的 CTMC 在离散的 token 上运行，我们使用 $\mathbf{x}(t)$ 而不是 $\mathbf{s}(t)$ 来表示代表 token 序列的状态。令 $\{\mathbf{x}(t)\}_{t \ge 0}$ 为一个随机过程，其中 $\mathbf{x}(t)$ 是时间 $t$ 时由 $n$ 个 token 组成的序列。令 $\mathbf{x}$ 和 $\mathbf{y}$ 表示离散空间 $V^n$ 中的特定状态（即 token 序列）。概率分布 $p_t(\mathbf{x}) = \Pr(\mathbf{x}(t)=\mathbf{x})$ 的演化由 Kolmogorov 前向方程支配
+\begin{eqnarray}
+\frac{d p_t(\mathbf{x})}{dt} & = & \sum_{\mathbf{y} \in V^n} p_t(\mathbf{y}) [\mathbf{Q}^{\mathrm{seq}}(t)]_{\mathbf{y}\mathbf{x}}, \label{eq:ctmc-equation}
+\end{eqnarray}
+
+\noindent 其中 $\mathbf{Q}^{\mathrm{seq}}(t)$ 是整个序列的（时间相关的）生成器矩阵。项 $[\mathbf{Q}^{\mathrm{seq}}(t)]_{\mathbf{y}\mathbf{x}}$ 表示从状态 $\mathbf{y}$ 到状态 $\mathbf{x}$ 的瞬时转移率，它是大矩阵 $\mathbf{Q}^{\mathrm{seq}}(t)$ 中的一个元素。
+
+然而，状态空间大小 $|V|^n$ 是指数级大的，使得完整的矩阵 $\mathbf{Q}^{\mathrm{seq}}(t)$ 在计算上不可行。为了解决这个问题，我们通常在前向过程中假设 token 位置之间相互独立。在此假设下，转移在每个位置上独立发生。因此，我们可以使用一个更小的单 token 生成器矩阵 $\mathbf{Q}^{\mathrm{tok}}(t) \in \mathbb{R}^{|V| \times |V|}$ 来建模该过程，该矩阵作用于单个 token。因此，$\mathbf{Q}^{\mathrm{seq}}(t)$ 的复杂高维动力学可以分解为 $n$ 个并行的过程，每个过程都由相同的单 token 生成器 $\mathbf{Q}^{\mathrm{tok}}(t)$ 支配。图 \ref{fig:ctmc-for-sequence-generation} 展示了方程 (\ref{eq:ctmc-equation}) 的示意图。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-ctmc-for-sequence-generation}
+\caption{连续时间马尔可夫链在标记序列生成中的示意图。该连续时间马尔可夫链在时间 $t$ 的动力学方程为 $\frac{d p_t(\mathbf{x})}{dt} = \sum_{\mathbf{y} \in V^n} p_t(\mathbf{y}) [\mathbf{Q}^{\mathrm{seq}}(t)]_{\mathbf{y}\mathbf{x}}$。该方程表明，观测到目标序列 $\mathbf{x}$（例如 \texttt{ADBCC}）的概率变化率，是所有可能源序列（例如 $\mathbf{y}_1$、$\mathbf{y}_2$、$\mathbf{y}_3$）的概率之和，并以序列级转移速率 $[\mathbf{Q}^{\mathrm{seq}}(t)]_{\mathbf{y}\mathbf{x}}$ 加权。全局转移速率由底层的标记级动力学决定。例如，从序列 $\mathbf{y}_3$ 到 $\mathbf{x}$ 的转移涉及单个标记的变化，例如第四个标记从 \texttt{D} 变为 \texttt{C} 的速率 $Q^{\mathrm{tok}}_{\mathrm{DC}}(t)$。请注意，虽然连续时间马尔可夫链在连续时间中建模动力学，但状态转移本身是离散的跳跃，而非连续变化。}
+\label{fig:ctmc-for-sequence-generation}
+\end{figure}
+
+需要注意的是，虽然 CTMC 通过方程 (\ref{eq:ctmc-equation}) 中的前向方程提供了连续时间的视角，但 NLP 中实用的离散扩散模型通常运行在离散的时间网格 $t \in \{0,1,\dots,T\}$ 上。在这种情况下，过程通过相邻时间步之间的转移核（或矩阵）来实现，而 CTMC 表达式可以理解为这些离散化动力学的连续时间极限。
+
+使用 CTMC，我们将前向和后向过程描述如下：
+
+\begin{itemize}
+\item \textbf{前向过程}。在连续时间马尔可夫链（CTMCs）中，我们并非通过添加高斯噪声，而是通过随机标记替换来破坏文本。这一过程由预定义的生成器矩阵$\mathbf{Q}^{\mathrm{tok}}(t)$决定。常用的破坏方案包括：
+    \begin{itemize}
+    \item \textbf{均匀扩散}：标记以均匀速率跳转到词汇表中的任意其他标记。这类似于连续空间中的高斯噪声，后者将数据分布推向标准正态分布。在此情况下，分布会收敛为词汇表$V$上的均匀分布。
+    \item \textbf{掩码扩散（吸收态）}：标记以特定速率转移至特殊的\texttt{[MASK]}标记且不可逆，这对应于马尔可夫链中的吸收态。
+    \end{itemize}
+\item \textbf{反向过程}。随机过程中的一个标准结果表明，如果前向过程是一个具有生成器 $\mathbf{Q}^{\mathrm{tok}}(t)$ 的 CTMC，那么从 $T$ 到 $0$ 反向运行的后向过程也是一个 CTMC \citep{anderson:1982reverse}。其生成速率矩阵 $\tilde{\mathbf{Q}}^{\mathrm{tok}}(t)$ 由下式给出：
+\begin{eqnarray}
+\tilde{Q}^{\mathrm{tok}}_{vu}(t) & = & Q^{\mathrm{tok}}_{uv}(t) \frac{p_t(u)}{p_t(v)}, \label{eq:reverse-ctmc}
+\end{eqnarray}
+\noindent 其中 $u, v \in V$ 代表词汇表中的特定 token 值，且上述非对角速率在
+$p_t(v)>0$ 时定义。这里，$\tilde{Q}^{\mathrm{tok}}_{vu}(t)$ 表示反向过程中
+从值 $v$ 转移到值 $u$ 的速率，$p_t(v)$ 是 token 在时间 $t$ 取值为 $v$
+的边缘概率；反向生成器的对角元由每一行元素之和为零的条件确定。
+\end{itemize}
+
+上述方程建立了 CTMC 与离散扩散模型之间的基本联系。它是反向时间 SDE 公式的离散类比，该公式将反向漂移与得分函数 $\nabla \log p_t(\mathbf{x})$ 联系起来。在离散情况下，概率比 $p_t(u)/p_t(v)$ 充当“离散得分”，引导生成过程朝向高概率的 token。需要强调的是，方程 (\ref{eq:reverse-ctmc}) 首先描述单词元的边缘 CTMC；当完整序列的各位置存在相关性时，精确反向过程应定义在序列状态空间 $V^n$ 上，并使用联合序列概率之比。因此，仅依赖单词元边缘比的逐位置参数化一般并不足够。实践中，Transformer 通过读取完整的损坏序列来条件化各位置的跳转速率，从而表达跨位置依赖；在前向生成元只允许单位置跳转的设定下，这种全序列条件化的速率参数化在结构上可以表示相应的精确反向生成元。
+
+方程 (\ref{eq:reverse-ctmc}) 是时间反转 CTMC 的理论刻画，其中反向速率依赖于真实的边缘分布 $p_t(\cdot)$。在用于文本的离散扩散模型中，我们通常不显式地估计 $p_t(\cdot)$。相反，反向动力学是通过反向后验 $\Pr(\mathbf{x}(t-\Delta t)\mid \mathbf{x}(t),\mathbf{x}(0),\mathbf{c})$ 的贝叶斯分解来构建的。因此，方程 (\ref{eq:reverse-ctmc}) 主要用于提供直觉，说明为什么概率比或后验重加权会引导反向过程朝向高概率的 token。在实践中，我们使用神经网络（通常是 Transformer）对反向动力学进行参数化，该网络预测一个去噪分布，例如 $p_\theta(\mathbf{x}(0)| \mathbf{x}(t),\mathbf{c})$ \footnote{在大多数设置中，前向破坏过程被选择为独立于 $\mathbf{c}$。我们在符号中保留 $\mathbf{c}$ 是为了匹配条件生成的设定，并允许更一般的情况，即噪声过程可能依赖于 $\mathbf{c}$。}。
+
+基于 CTMC 的扩散建模中的一个代表性例子是 \citet{austin-etal:2021structured} 提出的 \textbf{结构化去噪扩散概率模型}（D3PM）。虽然早期尝试离散扩散通常依赖于简单的均匀转移概率，但 D3PM 通过结构化转移矩阵将该框架推广到支持任意噪声过程。重要的是，\citet{austin-etal:2021structured} 证明了破坏过程的选择会显著影响样本质量。他们引入了几种超越标准均匀扩散的结构化转移方案。在模型参数化方面，D3PM 不同于噪声预测范式。由于噪声在离散空间中不是加性的，D3PM 被训练为直接从噪声输入中预测干净的数据分布 $p_\theta(\mathbf{x}(0) | \mathbf{x}(t), \mathbf{c})$。
+
+需要注意的是，由于在训练期间可以获得真实值 $\mathbf{x}(0)$，我们可以直接计算真实的反向后验 $q(\mathbf{x}(t - \Delta t) | \mathbf{x}(t), \mathbf{x}(0), \mathbf{c})$。因此，这个真实后验作为模型转移概率的监督信号。
+
+形式上，这个反向后验对应于前一个时间步的分布。遵循扩散模型中的常见符号，我们用 $q$ 表示前向条件分布。那么，反向后验可以使用贝叶斯规则推导：
+\begin{eqnarray}
+q(\mathbf{x}(t - \Delta t) | \mathbf{x}(t), \mathbf{x}(0), \mathbf{c}) & = & \frac{q(\mathbf{x}(t) | \mathbf{x}(t - \Delta t), \mathbf{c}) \, q(\mathbf{x}(t - \Delta t) | \mathbf{x}(0), \mathbf{c})}{q(\mathbf{x}(t) | \mathbf{x}(0), \mathbf{c})}.
+\end{eqnarray}
+
+\noindent 这里，序列上的概率分布分解为独立的 per-token 转移，例如：
+\begin{eqnarray}
+q(\mathbf{x}(t)|\mathbf{x}(0), \mathbf{c}) & = & \prod_{i=1}^{n} q(x_i(t)|x_i(0), \mathbf{c}),
+\end{eqnarray}
+
+\noindent 其中每个概率 $q(x_i(t)|x_i(0), \mathbf{c})$ 由单 token 生成器 $\mathbf{Q}^{\mathrm{tok}}(t)$ 决定
+\footnote{准确地说，$q(x_i(t)|x_i(0), \mathbf{c})$ 对应于单 token 转移概率矩阵
+$\mathbf{P}^{\mathrm{tok}}(0,t) = \exp\!\left(\int_0^t \mathbf{Q}^{\mathrm{tok}}(\tau)\, d\tau\right)$ 的 $(x_i(0), x_i(t))$ 元素（假设随时间可交换）。
+从物理上讲，$\mathbf{P}^{\mathrm{tok}}(0,t)$ 表示在区间 $[0, t]$ 内 token 之间转移的总概率质量。
+由于马尔可夫性质，该矩阵也可以被视为连续离散时间步上转移矩阵的乘积：如果我们将区间离散化为 $0=t_0 < t_1 < \dots < t_k=t$，那么
+$\mathbf{P}^{\mathrm{tok}}(0,t) = \mathbf{P}^{\mathrm{tok}}(t_{k-1},t_k)\times\dots\times \mathbf{P}^{\mathrm{tok}}(t_0,t_1)$。}。在实践中，对于像均匀扩散和掩码扩散这样的结构化 $\mathbf{Q}^{\mathrm{tok}}(t)$ 矩阵，前向转移概率 $q(x(t) | x(0), \mathbf{c})$ 具有简单的解析闭式解。对于均匀扩散，我们有：
+\begin{eqnarray}
+q(x(t) | x(0), \mathbf{c}) & = & \alpha_t \cdot \mathbb{I}(x(t) = x(0)) + (1 - \alpha_t) \cdot \frac{1}{|V|},
+\end{eqnarray}
+
+\noindent 其中 $\alpha_t$ 是一个依赖于时间的标量调度参数，控制信号保留率。类似地，对于吸收态（掩码）扩散，概率质量被导向一个特殊的 \texttt{[MASK]} token。相应的闭式转移概率由下式给出：
+\begin{eqnarray}
+q(x(t) | x(0), \mathbf{c}) & = & \begin{cases} \alpha_t, & \text{if } x(t) = x(0), \\ 1 - \alpha_t, & \text{if } x(t) = \texttt{[MASK]}, \\ 0, & \text{otherwise.} \end{cases}
+\end{eqnarray}
+
+这些解析解使我们能够绕过前向过程中计算昂贵的矩阵运算。有了这些易于处理的前向概率，后向过程通过将神经网络对原始 token 序列的预测 $p_\theta(\mathbf{x}(0) | \mathbf{x}(t), \mathbf{c})$ 代入上述推导的贝叶斯分解来实现。这产生了一个反向转移分布 $p_\theta(\mathbf{x}(t - 1) | \mathbf{x}(t), \mathbf{c})$，我们可以从中采样。图 \ref{fig:d3pm-forward-and-reverse-processes} 展示了在假设 $\Delta t = 1$ 的情况下，D3PM 中均匀扩散的前向和后向过程。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-d3pm-forward-and-reverse-processes}
+\caption{D3PM 均匀扩散中前向与后向过程的示意图。在前向过程中，状态在每个 $\Delta t = 1$ 的时间步跳转到一个新状态，初始状态为 $(\mathbf{x}(0), \mathbf{c})$，最终状态为 $(\mathbf{x}(T), \mathbf{c})$。在前向步骤中，我们计算前向转移概率 $q(\mathbf{x}(t) | \mathbf{x}(t - 1), \mathbf{c})$，然后可用其计算反向后验 $q(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{x}(0),\mathbf{c})$ 以训练后向模型。在后向过程中，模型沿时间反向演化。在每个后向步骤中，我们使用网络 $p_\theta(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{c})$ 预测词元序列 $\mathbf{x}(t-1)$，然后继续处理 $t - 1$。网络的训练目标是，在 $q$ 的期望下，最小化 $q(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{x}(0),\mathbf{c})$ 与 $p_\theta(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{c})$ 之间的 KL 散度。}
+\label{fig:d3pm-forward-and-reverse-processes}
+\end{figure}
+
+为了训练模型，我们希望最大化观测数据 $\log p_\theta(\mathbf{x}(0) | \mathbf{c})$ 的对数似然。然而，这需要对所有可能的轨迹 $\mathbf{x}(1{:}T)$ 进行边缘化，这是不可行的。通过引入前向过程 $q(\mathbf{x}(1{:}T) | \mathbf{x}(0), \mathbf{c})$ 作为辅助分布，我们可以将对数边缘概率重写为一个期望：
+\begin{eqnarray}
+\log p_\theta(\mathbf{x}(0) | \mathbf{c}) & = & \log\sum_{\mathbf{x}(1{:}T)} q(\mathbf{x}(1{:}T) | \mathbf{x}(0), \mathbf{c}) \frac{p_\theta(\mathbf{x}(0{:}T) | \mathbf{c})}{q(\mathbf{x}(1{:}T) | \mathbf{x}(0), \mathbf{c})} \nonumber \\
+& = & \log \mathbb{E}_{q(\mathbf{x}(1{:}T) | \mathbf{x}(0), \mathbf{c})} \left[ \frac{p_\theta(\mathbf{x}(0{:}T) | \mathbf{c})}{q(\mathbf{x}(1{:}T) | \mathbf{x}(0), \mathbf{c})} \right].
+\end{eqnarray}
+
+\noindent 应用 Jensen 不等式，我们将对数移到期望内部，推导出一个可处理的 \textbf{证据下界}（ELBO）：
+\begin{eqnarray}
+\log p_\theta(\mathbf{x}(0) | \mathbf{c}) & \ge & \mathbb{E}_{q(\mathbf{x}(1{:}T) | \mathbf{x}(0), \mathbf{c})} \left[ \log \frac{p_\theta(\mathbf{x}(0{:}T) | \mathbf{c})}{q(\mathbf{x}(1{:}T) | \mathbf{x}(0), \mathbf{c})} \right].
+\end{eqnarray}
+
+通过将联合分布 $p_\theta(\mathbf{x}(0{:}T) | \mathbf{c})$ 和前向轨迹 $q(\mathbf{x}(1{:}T) | \mathbf{x}(0), \mathbf{c})$ 展开为各自条件分布的乘积，然后重新排列项，负 ELBO 可以分解为每步 KL 散度项的和（关于离散设置下的完整推导，请参见 \citep{austin-etal:2021structured})。模型最小化的最终训练目标由下式给出：
+\begin{eqnarray}
+\mathcal{L}_{\mathrm{ELBO}} & = & \mathbb{E}_{q(\mathbf{x}(1{:}T)| \mathbf{x}(0),\mathbf{c})}
+\Bigg[
+-\log p(\mathbf{x}(T))
++ \nonumber \\
+& & \hspace{2.7cm} \sum_{t=1}^{T}
+\mathrm{KL}\!\Big(
+q(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{x}(0),\mathbf{c})
+\,\Vert\,
+p_\theta(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{c})
+\Big)
+\Bigg],
+\label{eq:discrete-elbo}
+\end{eqnarray}
+
+\noindent 在这个目标中，项 $q(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{x}(0),\mathbf{c})$ 表示反向转移的真实后验。这里的一个关键优势是，对于结构化的前向过程（如均匀噪声或掩码），这个后验分布可以使用贝叶斯规则高效地以闭式计算。关于第一项，由于先验 $p(\mathbf{x}(T))$ 通常是一个没有可学习参数的固定分布（例如均匀分布或确定性的掩码状态），$-\log p(\mathbf{x}(T))$ 相对于 $\theta$ 是常数，可以省略。因此，核心的学习信号驱使模型 $p_\theta$ 将其反向转移概率与前向动力学所决定的理想反向路径对齐。
+\subsubsection{掩码扩散模型}
+
+\textbf{掩码扩散模型}（Masked Diffusion Models, MDMs）是离散扩散的一种专门实现，其转移速率矩阵 $\mathbf{Q}^{\mathrm{tok}}(t)$ 被设计为将概率质量移向一个特殊的吸收态，记作 \texttt{[MASK]} 标记 \citep{sahoo-etal:2024simple,nie-etal:2025large}。这种方法提供了一个独特的实践优势：一旦一个标记在前向过程中转移到掩码状态，它就会停留在那里，从而创建了一条通向完全损坏状态的单向路径。
+
+前向过程逐步将原始序列中的标记替换为 \texttt{[MASK]}。它从一个完全观测到的序列开始，逐渐破坏信息，直到整个序列变为仅包含掩码的序列。在实践中，我们将时间离散化，并在离散时间步 $\{0,1,\dots,T\}$ 上实现该过程为一个离散时间马尔可夫链。令 $\mathbf{x}(t)$ 为时间 $t \in \{0,1,\dots,T\}$ 的损坏序列，其中 $\mathbf{x}(0)$ 是干净数据，$\mathbf{x}(T) = \texttt{[MASK]}^n$，$x_i(t)$ 是 $\mathbf{x}(t)$ 的第 $i$ 个标记。在前向过程中，假设各位置之间独立，掩码扩散可以写为每个标记的吸收转移：
+\begin{eqnarray}
+q(\mathbf{x}(t) | \mathbf{x}(0), \mathbf{c}) & = & \prod_{i=1}^n q(x_i(t) | x_i(0), \mathbf{c}), \label{eq:mdm-forward-factorize}
+\end{eqnarray}
+
+\noindent 其中单标记前向核为：
+\begin{eqnarray}
+q(x_i(t) | x_i(0), \mathbf{c}) & = &\alpha_t \cdot \mathbb{I}(x_i(t)=x_i(0)) + (1-\alpha_t)\cdot \mathbb{I}(x_i(t)=\texttt{[MASK]}). \label{eq:mdm-forward-absorbing}
+\end{eqnarray}
+
+\noindent 这里 $\alpha_t \in [0,1]$ 是一个单调递减的调度函数，控制着在时间 $t$ 保留多少信号。等价地，我们可以将 $\mathbf{x}(t)$ 视为通过采样一个二元掩码指示向量 $\mathbf{m}_t\in\{0,1\}^n$ 生成，其中：
+\begin{eqnarray}
+m_{t,i} \sim \mathrm{Bernoulli}(1-\alpha_t), \\
+x_i(t) = \begin{cases}
+\texttt{[MASK]}, & m_{t,i}=1, \\
+x_i(0), & m_{t,i}=0.
+\end{cases}
+\label{eq:mdm-forward-maskvar}
+\end{eqnarray}
+
+\noindent 因此，扩散轨迹可以解释为重复增加掩码位置的集合，直到最终所有位置都被掩码，如图 \ref{fig:mdm-diffusion-process} 所示。
+
+\begin{figure}[!t]
+\centering
+\AMLFigure{figure-mdm-diffusion-process}
+\caption{MDM 前向过程示意图，其中原始标记序列被迭代地转换为完全掩码序列。在此过程中，标记被替换为 \texttt{[MASK]} 符号，直至整个序列被掩码。注意，上下文 $\mathbf{c}$ 在整个过程中始终保持未掩码状态。为训练 MDM，模型学习在固定上下文 $\mathbf{c}$ 和部分损坏序列的条件下，恢复被掩码的标记。}
+\label{fig:mdm-diffusion-process}
+\end{figure}
+
+后向过程从 $t=T$ 运行到 $t=0$。给定上下文 $\mathbf{c}$ 和一个初始的完全掩码序列 $\mathbf{x}(T)=\texttt{[MASK]}^n$，MDM 迭代地将 \texttt{[MASK]} 标记替换为真实标记，直到在 $V^n$ 中获得一个完全实例化的序列。形式上，我们定义一个参数化的逆向马尔可夫链：
+\begin{eqnarray}
+p_\theta(\mathbf{x}(t-1)| \mathbf{x}(t), \mathbf{c}), \quad t=T,T-1,\dots,1,
+\label{eq:mdm-reverse-kernel}
+\end{eqnarray}
+
+\noindent 这里 $p_\theta(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{c})$ 是逆向条件分布 $\mathrm{Pr}_\theta(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{c})$ 的记法，下标 $\theta$ 强调逆向时间动力学是由 $\theta$ 参数化的。
+
+一种简单的参数化方法是让网络预测干净标记的去噪分布：
+\begin{eqnarray}
+p_\theta(\mathbf{x}(0)| \mathbf{x}(t), \mathbf{c}) = \prod_{i=1}^{n} p_\theta(x_i(0)| \mathbf{x}(t), \mathbf{c}).
+\label{eq:mdm-denoise-factorize}
+\end{eqnarray}
+
+\noindent 然后，通过仅更新掩码位置来构建逆向转移，同时保持未掩码的标记不变。为了与前向调度 $\alpha_t$ 一致，令
+\begin{eqnarray}
+\rho_t=\frac{\alpha_{t-1}-\alpha_t}{1-\alpha_t},
+\label{eq:mdm-unmask-probability}
+\end{eqnarray}
+其中 $\rho_t$ 表示在已知位置于时刻 $t$ 被掩码的条件下，该位置在反向步骤 $t\to t-1$ 中恢复为词元的概率。对于 $v\in V\cup\{\texttt{[MASK]}\}$，每个位置的逆向核可以写为：
+\begin{eqnarray}
+p_\theta(x_i(t-1)=v| \mathbf{x}(t), \mathbf{c})
+=
+\begin{cases}
+\mathbb{I}\!\left(v=x_i(t)\right), & x_i(t) \neq \texttt{[MASK]},\\
+1-\rho_t, & x_i(t)=\texttt{[MASK]},\ v=\texttt{[MASK]},\\
+\rho_t\,\pi_{\theta,t,i}\!\left(v | \mathbf{x}(t), \mathbf{c}\right),
+& x_i(t)=\texttt{[MASK]},\ v\in V,
+\end{cases}
+\label{eq:mdm-reverse-keep-or-sample}
+\end{eqnarray}
+其中 $\pi_{\theta,t,i}(\cdot | \mathbf{x}(t),\mathbf{c})$ 是由模型产生的在 $V$ 上的分类分布。一个常见的选择是：
+\begin{eqnarray}
+\pi_{\theta,t,i}\!\left(v | \mathbf{x}(t),\mathbf{c}\right)=p_\theta\!\left(x_i(0)=v | \mathbf{x}(t),\mathbf{c}\right), \quad v\in V,
+\label{eq:mdm-pi-as-denoise}
+\end{eqnarray}
+即，直接从预测的干净标记分布中采样缺失的标记。
+
+给定一个示例数据集 $(\mathbf{x}(0),\mathbf{c})\sim p_{\text{data}}$，MDMs 通过最大化干净序列的条件似然（或等价地最小化其负对数似然）来学习逆向模型 $p_\theta$。与其他扩散模型类似，我们可以使用 ELBO 来训练 MDMs（另见第 \ref{sec:the-ctmc-perspective} 节中的 D3PM）。
+
+尽管上述训练目标看起来有些繁琐，但在实践中，一个更简单且广泛使用的方法是训练模型以恢复掩码位置处的原始标记。我们采样一个时间步 $t\sim U\{1,\dots,T\}$，然后采样一个损坏序列 $\mathbf{x}(t)\sim q(\mathbf{x}(t)| \mathbf{x}(0),\mathbf{c})$。我们定义掩码索引集为：
+\begin{eqnarray}
+\mathcal{M}(t) & = & \{i\in\{1,\dots,n\} : x_i(t)=\texttt{[MASK]}\}.
+\end{eqnarray}
+
+\noindent 损失函数则定义为掩码位置上的条件负对数似然，如下所示：
+\begin{eqnarray}
+& & \mathcal{L}_{\text{denoise}}(\theta) \nonumber \\
+&=&
+\mathbb{E}_{(\mathbf{x}(0),\mathbf{c})\sim p_{\text{data}}}
+\;
+\mathbb{E}_{t\sim U[T]}
+\;
+\mathbb{E}_{\mathbf{x}(t)\sim q(\mathbf{x}(t)| \mathbf{x}(0),\mathbf{c})}
+\Bigg[
+-\sum_{i\in \mathcal{M}(t)} \log p_\theta\!\left(x_i(0)| \mathbf{x}(t),\mathbf{c}\right)
+\Bigg].
+\label{eq:mdm-denoise-ce}
+\end{eqnarray}
+
+\noindent 可选地，可以对时间步进行重新加权以强调某些噪声水平：
+\begin{eqnarray}
+\mathcal{L}_{\text{denoise}}(\theta)
+& = &
+\mathbb{E}\Bigg[
+\gamma_t \cdot
+\Big(-\sum_{i\in \mathcal{M}(t)} \log p_\theta(x_i(0)| \mathbf{x}(t),\mathbf{c})\Big)
+\Bigg],
+\label{eq:mdm-denoise-ce-weighted}
+\end{eqnarray}
+其中 $\gamma_t\ge 0$ 是一个预定义的调度函数。直观上，类似于课程学习，小的 $t$ 对应轻度损坏（即较容易的去噪），而大的 $t$ 对应重度损坏（即较难的去噪）。权重 $\gamma_t$ 可以用来平衡这些状态。
+
+训练完成后，我们使用学习到的逆向核 $p_\theta(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{c})$ 通过从完全掩码状态向后运行马尔可夫链来生成文本。推理过程从以下开始：
+\begin{eqnarray}
+\mathbf{x}(T) = \texttt{[MASK]}^n,
+\end{eqnarray}
+
+\noindent 并迭代地采样：
+\begin{eqnarray}
+\mathbf{x}(t-1) \sim p_\theta(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{c}), \quad t=T,T-1,\dots,1.
+\label{eq:mdm-sampling-chain}
+\end{eqnarray}
+在方程 (\ref{eq:mdm-reverse-keep-or-sample}) 的每标记因式分解下，逆向步骤仅可能更新掩码位置。对于每个满足 $x_i(t)=\texttt{[MASK]}$ 的位置，先采样
+\begin{eqnarray}
+b_{t,i}\sim\mathrm{Bernoulli}(\rho_t),
+\end{eqnarray}
+再令
+\begin{eqnarray}
+x_i(t-1) =
+\begin{cases}
+x_i(t), & x_i(t)\neq \texttt{[MASK]},\\
+\texttt{[MASK]}, & x_i(t)=\texttt{[MASK]},\ b_{t,i}=0,\\
+\mathrm{Cat}\!\left(\pi_{\theta,t,i}( \cdot | \mathbf{x}(t),\mathbf{c})\right),
+& x_i(t)=\texttt{[MASK]},\ b_{t,i}=1.
+\end{cases}
+\end{eqnarray}
+
+\noindent 其中 $\mathrm{Cat}(\cdot)$ 表示从其参数指定的分类分布中采样一个离散标记。于是，并非所有掩码位置都在同一步被填充；模型在已填充上下文的条件下逐步恢复缺失标记，直到所有位置都变为未掩码。
+
+除了按 $\rho_t$ 独立采样各位置，也可以在实践中采用显式的去掩码数量调度。令 $k_t$ 为从 $t$ 到 $t-1$ 时要新变为未掩码的标记数量，并令 $\mathcal{U}(t)\subseteq \mathcal{M}(t)$ 为要更新的掩码位置的选定子集，且 $|\mathcal{U}(t)| = k_t$。那么一个常见的实现是：
+\begin{eqnarray}
+x_i(t-1) =
+\begin{cases}
+x_i(t), & i\notin \mathcal{U}(t),\\
+\mathrm{Cat}\!\left(\pi_{\theta,t,i}(\cdot | \mathbf{x}(t),\mathbf{c})\right), & i\in \mathcal{U}(t).
+\end{cases}
+\label{eq:mdm-partial-update}
+\end{eqnarray}
+
+\noindent 调度函数 $\{k_t\}_{t=1}^T$ 在速度与准确性之间进行权衡：较大的 $k_t$ 导致更少的迭代次数，但要求模型在高不确定性下填充许多标记；而较小的 $k_t$ 产生更多的细化步骤，但增加了计算量。
+
+一个简单的选择是确定性调度，即每步揭示固定的比例（例如，在 $t$ 上呈线性或余弦变化），使得掩码标记的期望数量从 $n$ 减少到 $0$。另一种常见策略是基于模型置信度选择 $\mathcal{U}(t)$。给定 $\pi_{\theta,t,i}$，我们可以定义一个置信度分数为：
+\begin{eqnarray}
+s_{t,i} = \max_{v\in V}\ \pi_{\theta,t,i}\!\left(v| \mathbf{x}(t),\mathbf{c}\right),
+\end{eqnarray}
+
+\noindent 然后我们可以首先对置信度最高的位置进行去掩码。这种“先易后难”的启发式方法倾向于通过用可靠的标记锚定序列来稳定生成，然后再填充更模糊的标记。
+\subsection{离散扩散的评注}
+
+在本小节中，我们讨论在词元空间进行离散扩散时的若干建模考量。
+
+\subsubsection{对非吸收式替换扩散的再思考}
+\label{sec:rethink-non-absorbing}
+
+吸收式的 \texttt{[MASK]} 构造具有一种吸引人的信息单调性：前向过程仅移除信息，而反向过程则仅将其填充回来。这种设计与 Transformer 的去噪过程非常契合，并且最近在大规模扩散语言模型的预训练中展现了强大的可扩展性 \citep{sahoo-etal:2024simple,nie-etal:2025large}。尽管如此，重新审视非吸收式替换扩散方法（例如均匀扩散）仍然是有价值的，在这些方法中，词元可能在整条轨迹中被反复替换。
+
+首先，均匀替换是一个简单且行为良好的基线。D3PM 中使用的均匀替换核就是一个典型例子。在每一步中，一个词元要么被保留，要么被一个从词汇表中均匀采样的元素所替换。这种策略能得到闭式转移概率，从而保持训练的可处理性。此外，由于这种破坏在原则上是可逆的，反向过程不受不可逆吸收汇的约束。从概念上讲，均匀替换是添加各向同性高斯噪声的离散类比。它驱使分布趋向于一个简单的先验，同时保持对前向边缘分布的分析控制。
+
+其次，在非吸收式替换扩散中，反向更新是密集的。在掩码扩散中，未掩码的词元通常被保留，只有被掩码的位置会被更新。而在非吸收式替换扩散中，每个位置都保持随机性，因此一个自然的反向核可以在每一步更新所有词元。这类似于连续时间扩散模型的结构，其中所有维度在整个轨迹中都被精炼。动态过程可以修正任何组成部分以提高全局一致性，而不是将可见坐标视为固定。
+
+第三，非吸收式替换在语言中可能较为困难。如果词元可以被多次破坏，那么噪声序列 $\mathbf{x}(t)$ 可能包含局部流畅但全局不一致的片段，而反向模型必须同时推断缺失的语义并纠正错误的词元。这与掩码扩散形成对比，在掩码扩散中生成的词元通常是干净的。从连续时间马尔可夫链的视角看，非吸收式替换对应于一个生成器 $\mathbf{Q}^{\mathrm{tok}}(t)$，其所有词元对之间具有非零的非对角速率，因此概率质量在 $V$ 上持续循环，而不是流入单一的汇。随着 $t$ 的增加，信噪比可能比吸收式扩散下降得更快，因为即使是被观测到的词元也是不可靠的。
+
+最近的研究探索了将吸收式掩码与额外的替换噪声相结合的方法，以诱导一种纠正行为。通过这种方式，模型可以检测并修复损坏的词元，而不仅仅是填充被掩码的位置 \citep{zhang-etal:2025corrective,rutte-etal:2025generalized}。这种混合视角表明，非吸收式噪声不仅仅是掩码扩散的竞争者，还可以作为一种互补机制来增强鲁棒性和自校正能力。
+
+一个简单的想法是考虑结构化的替换策略。在自然语言处理中，一种自然的方法是使用依赖于词元或结构感知的转移速率来偏置替换，例如：
+\begin{eqnarray}
+Q^{\mathrm{tok}}_{uv}(t) & = & w_{uv}(t),
+\end{eqnarray}
+
+\noindent 其中 $w_{uv}(t)$ 建模了混淆性，它可以是频率感知的、与子词相关的或基于嵌入相似性的。其动机是使早期噪声在语义上是局部的（易于去噪），而使晚期噪声是全局混合的（接近一个简单的先验）。这类似于连续扩散中的方差保持与方差爆炸设计选择，但现在表示为离散转移结构上的调度。
+
+另一个有趣的方向是在掩码式吸收扩散与均匀替换扩散之间进行插值。例如，可以在生成器层面考虑一种组合：
+\begin{equation}
+\mathbf{Q}^{\mathrm{tok}}(t) = \lambda_t \cdot \mathbf{Q}_{\text{mask}}^{\mathrm{tok}}(t) + (1-\lambda_t) \cdot \mathbf{Q}_{\text{unif}}^{\mathrm{tok}}(t),
+\end{equation}
+
+\noindent 其中模型在某些噪声水平下表现得像掩码扩散，而在其他水平下则保留在未掩码词元之间分配概率质量的能力。最近的研究已经探索了这种组合，以同时获得两种机制的优势（来自吸收式破坏的稳定性和来自替换式破坏的灵活性）。
+\subsubsection{掩码扩散建模与掩码语言建模}
+
+在一般的“损坏-去噪”框架下，掩码扩散模型的训练目标与\textbf{掩码语言建模}（MLM）非常接近。例如，在类BERT模型中，我们采样一个掩码模式，并训练一个双向Transformer，使其能够根据部分观察到的上下文来预测掩码位置处的原始词元\citep{devlin-etal:2019bert}。如果我们将式~(\ref{eq:mdm-forward-maskvar})解释为以掩码率$(1-\alpha_t)$采样一个掩码指示符$\mathbf{m}_t$，那么式~(\ref{eq:mdm-denoise-ce})中的去噪损失本质上就是一个MLM交叉熵损失，区别仅在于损坏程度通过$\alpha_t$被时间明确索引，并且网络以扩散步数$t$为条件。因此，主要的概念差异不在于监督信号，而在于去噪器的部署方式。BERT的MLM主要是一种用于表示学习的预训练目标，而掩码扩散模型则将相同的去噪基本操作解释为一个逆时间转移核，并从一个完全掩码的状态开始迭代应用它，以生成一个自然的词元序列。从这个意义上说，现代的掩码扩散模型在架构上通常看起来像BERT，但它们将MLM从一个预训练任务转变为一个序列生成的过程。
+
+掩码扩散模型与MLM之间的联系揭示了一个有趣的方向：由于掩码扩散中的前向过程是一种特定的损坏选择，许多为NLP预训练开发的加噪策略可以被重新解释为离散扩散的替代前向核。也就是说，除了独立的词元掩码之外，我们还可以改变被损坏的对象（词元与文本片段）、损坏的方式（掩码、替换或置换）以及损坏程度随时间演变的方式（手动设计或学习得到的调度方案）。以下是在设计掩码扩散模型时可以考虑的一些常见加噪策略。
+
+\begin{itemize}
+\item \textbf{非均匀分布的标记替换。}
+与均匀替换标记不同，可以从频率调整的分布中采样替换项，或从学习到的提议分布中采样。例如 ELECTRA 模型，其中一个小型生成器提出合理的替换项，判别器则被训练来检测它们 \citep{clark-etal:2019electra}。从扩散的角度看，这种更困难的非均匀替换可视为注入了比随机标记更具语义混淆性的噪声，这可能会鼓励更强的条件去噪器，并缩小训练时使用的损坏与推理时的不确定性之间的差距。
+\item \textbf{片段损坏。}
+T5 系列模型将连续的片段替换为单个哨兵标记，并学习重建缺失的内容 \citep{raffel-etal:2020exploring}。对于扩散式生成，片段损坏是自然的：逆向过程可被解释为逐步将粗糙的缺失区域细化为详细的文本。这与在结构化槽位上迭代去噪而非在独立标记空白处去噪的直觉相符。然而，这种方法的一个挑战在于，将多个标记替换为单个哨兵标记会改变序列长度，这违反了标准扩散模型的固定维度假设。为解决此问题，我们可以采用类似于 SpanBERT 的就地片段掩码 \citep{joshi-etal:2020spanbert}，即连续标记被掩码但序列长度保持不变。或者，可以扩展前向核以显式建模插入和删除操作，从而处理可变长度的轨迹 \citep{gu-etal:2019levenshtein,reid-etal:2022diffuser}。
+\item \textbf{标记重排与置换噪声。}
+BART 引入了带有标记删除和句子置换等损坏的去噪预训练。该方法要求模型不仅学习内容恢复，还要学习重新排序 \citep{lewis-etal:2020bart}。将其重新定义为扩散前向核，则意味着存在一类更广泛的离散动态过程，它们同时扰动身份信息和位置信息。这种方法可以导致逆向过程执行联合的“编辑 + 重排序”细化，而非纯粹的填充。
+\item \textbf{对抗性加噪。}
+另一个方向是利用模型引导的扰动或辅助网络生成更具挑战性的损坏。用于 NLP 的对抗性训练方法（例如，嵌入级扰动）表明，更强、结构化的噪声可以提高鲁棒性 \citep{zhu-etal:2020freelb}。虽然许多对抗性方法是在连续嵌入空间中定义的，但其核心思想适用于扩散建模。我们可以选择在每个噪声级别上对去噪器施加最大压力的损坏方式，这原则上可以使学习到的逆向动态在迭代采样下更加稳定。
+\item \textbf{学习到的加噪调度。}
+与其手动固定调度 $\alpha_t$，不如尝试学习在每个步骤中应用多少以及何种类型的噪声，例如，通过优化目标组合或选择最能服务于下游用途的损坏机制 \citep{tay-etal:2023ul2}。在扩散建模中，这促使学习时间非齐次的损坏策略，以塑造轨迹，从而获得更好的样本质量或更少的生成步骤。
+\end{itemize}
+\subsubsection{单纯形与Logit动态作为连续松弛方法}
+
+我们已经看到，连续时间马尔可夫链（CTMC）的表述将离散扩散过程建模为分布动态。尽管样本路径$\mathbf{x}(t)\in V^n$在分类状态间跳跃，但通过式(\ref{eq:ctmc-equation})中的Kolmogorov方程，边缘分布$p_t(\cdot)$会随时间$t$平滑演化。这一观察启发了我们对语言建模的有用松弛方法：不再将中间状态视为硬标记序列，而是用单纯形上的概率列向量表示每个位置：
+\begin{eqnarray}
+\mathbf{p}_i(t) & \in & \Delta^{|V|-1}, \\
+\mathbf{p}_i(t)[v] & = & \Pr(x_i(t)=v \mid \mathbf{c}).
+\end{eqnarray}
+
+\noindent 我们将这些向量聚合为矩阵$\mathbf{P}(t) = [\mathbf{p}_1(t), \dots, \mathbf{p}_n(t)] \in \mathbb{R}^{|V| \times n}$，其中每列位于单纯形上。这将离散轨迹转换为单纯形积空间上的连续曲线，从而可以应用ODE/SDE工具的同时保持标记的分类特性。
+
+对于生成器为$\mathbf{Q}^{\mathrm{tok}}(t) \in \mathbb{R}^{|V| \times |V|}$的标记级CTMC，单个位置的边缘分布满足Kolmogorov正向方程：
+\begin{eqnarray}
+\frac{d \mathbf{p}_i(t)}{dt} & = & \left[ \mathbf{Q}^{\mathrm{tok}}(t) \right]^\top \mathbf{p}_i(t),
+\label{eq:simplex-forward-ode}
+\end{eqnarray}
+
+\noindent 这是单纯形上的一个ODE。注意$\mathbf{Q}^{\mathrm{tok}}(t)$的行和为零，因此总概率守恒。在噪声过程中各位置独立的假设下，每个$\mathbf{p}_i(t)$都遵循相同的ODE演化。这为语言建模提供了ODE视角：离散扩散可视为选择由$\mathbf{Q}^{\mathrm{tok}}(t)$诱导的单纯形上线性正向向量场，而非$\mathbb{R}^d$中的高斯SDE。
+
+直接在概率空间操作可能在单纯形边界附近（例如one-hot顶点）存在数值问题。常用替代方案是通过logit向量$\mathbf{z}_i(t)\in\mathbb{R}^{|V|}$参数化$\mathbf{p}_i(t)$：
+\begin{eqnarray}
+\mathbf{p}_i(t) & = &\mathrm{Softmax}(\mathbf{z}_i(t)).
+\end{eqnarray}
+
+\noindent 由此可在logit空间定义连续时间动态：
+\begin{eqnarray}
+\frac{d \mathbf{z}_i(t)}{dt} & = & \mathbf{v}_{\theta} \big(\mathbf{z}_i(t),t,\mathbf{c}\big),
+\label{eq:logit-ode}
+\end{eqnarray}
+
+\noindent 其中$\mathbf{v}_{\theta}$是由Transformer定义的向量场（各位置共享）。直观上，$\mathbf{z}_i(t)$如同连续细化的"软标记"，终端解码$\mathbf{z}_i(0)\mapsto x_i$可通过$\mathrm{Softmax}(\mathbf{z}_i(0))$的$\arg\max$实现。当需要可微采样时，也可使用Gumbel-Softmax分布等分类采样的松弛方法\citep{jang-etal:2017categorical,maddison-etal:2017the}。
+
+这种logit视角阐明了为何连续松弛常与嵌入空间扩散相似，却更接近离散建模：状态保持词汇对齐（每位置维度$|V|$）而非任意嵌入空间$\mathbb{R}^d$。它还直接关联到式(\ref{eq:simplex-forward-ode})的CTMC边缘ODE：选择的$\mathbf{Q}^{\mathrm{tok}}(t)$决定了$\mathbf{p}_i(t)$的特定演化，可通过Softmax映射重新表达为$\mathbf{z}_i(t)$的演化。
+
+如前面的随机概率动力学一节所述，在连续扩散中，逆向时间动态既可表示为涉及分数$\nabla \log p_t(\mathbf{s})$的SDE，也可表示为概率流ODE。在离散扩散中，精确的逆向CTMC速率取决于概率比$p_t(u)/p_t(v)$（式(\ref{eq:reverse-ctmc})），其作用类似于离散分数。当我们将状态提升至$\mathbf{p}(t)$或$\mathbf{z}(t)$时，可类似地将逆向过程解释为学习从简单先验（如全掩码或均匀分布）流向集中于表示真实文本的one-hot顶点附近的分布的向量场。最近的离散分数建模研究表明，可以定义避免显式计算$p_t(\cdot)$但仍产生理论合理的逆向动态的可处理训练目标\citep{hoogeboom-etal:2021argmax,lou-etal:2024discrete}。
+
+总结而言，我们概述单纯形与logit松弛的实践优势如下：
+\begin{itemize}
+\item \textbf{更高效的ODE求解器与更少的步数。}一旦将逆向动力学表达为如式~(\ref{eq:logit-ode})所示的ODE，我们就可以使用自适应ODE求解器或粗粒度离散化来减少采样步数，这与连续扩散和流模型中使用的加速策略相呼应（参见前面的数值采样与高效生成小节）。
+\item \textbf{与流匹配的兼容性。}在单纯形上，流匹配自然地对应于学习将软标记分布向尖锐的、类似数据的分类分布传输的$\mathbf{v}_\theta$，而无需在训练时依赖显式的基于似然的ELBO。
+\item \textbf{离散与连续之间的谱系。}掩码扩散（硬\texttt{[MASK]}状态）与嵌入扩散（连续嵌入）可被视为两个端点。单纯形/逻辑动态占据了一个中间地带。状态是连续的，但仍可直接解释为标记概率，并且到文本的最终投影是定义良好的。
+\end{itemize}
+\subsubsection{与迭代优化的关联}
+
+离散扩散的逆向过程与一系列关于非自回归生成中\textbf{迭代优化}的研究密切相关\citep{lee-etal:2018deterministic}。在迭代优化中，模型并非一次性获得最终序列，而是通过多轮优化迭代，反复生成完整序列并逐步修正其部分内容。例如条件掩码语言模型中的掩码预测方法，该方法从全\texttt{[MASK]}模板出发，交替执行并行词元预测与不确定位置子集的重新掩码操作，直至收敛或达到固定迭代次数\citep{ghazvininejad-etal:2019mask}。
+
+该方法可表述为与式~(\ref{eq:mdm-partial-update})相似的形式。设$\mathbf{x}^{(r)}$表示第$r$轮优化后的序列，$\pi_{\theta,i}^{(r)}(v | \mathbf{x}^{(r)},\mathbf{c})=p_{\theta}(x_i^{(r+1)} = v | \mathbf{x}^{(r)},\mathbf{c})$为第$r$轮位置$i$的预测分布，则优化步骤可表示为：
+\begin{eqnarray}
+x_i^{(r+1)} & = &
+\begin{cases}
+x_i^{(r)}, & i\notin \mathcal{U}^{(r)},\\
+\mathrm{Cat}\left(\pi^{(r)}_{\theta,i}(\cdot | \mathbf{x}^{(r)},\mathbf{c})\right), & i\in \mathcal{U}^{(r)},
+\end{cases}
+\label{eq:iterref-update}
+\end{eqnarray}
+
+\noindent 其中$\mathcal{U}^{(r)}$为第$r$轮待更新位置集合。典型情况下$\mathcal{U}^{(r)}$由低置信度定义，而简单扩散实现中常采用时间调度策略。换言之，掩码扩散采样可视为一种结构化优化过程——其掩码模式随时间$t$（即迭代优化中的迭代次数）单调演化，而经典优化方法允许基于模型不确定性的非单调决策（如对已填充词元重新掩码）。这一差异至关重要：单调解掩过程稳定但可能固化早期错误，而非单调优化虽可修正错误却可能因选择规则不明确导致振荡。
+
+近期扩散语言模型已开始显式融合迭代优化中标准的非单调修正行为。一种方法是在推理阶段重新掩码低置信度词元，将扩散采样与类掩码预测的复查机制结合\citep{koh-etal:2025conditional,zhang-etal:2025corrective}；另一种方法是通过修改前向破坏过程，使逆向模型不仅学习填充空白还需修正可见错误词元。这可通过混合吸收掩码噪声与替换噪声（如均匀替换）实现，从而产生天然支持修正与编辑的逆向过程\citep{rutte-etal:2025generalized}。这些方法与第\ref{sec:rethink-non-absorbing}节所述方案存在交集，也呼应了我们关于组合不同扩散策略的讨论。
+
+从扩散模型视角亦可解读迭代优化。式~(\ref{eq:simplex-forward-ode})--(\ref{eq:logit-ode})中的单纯形与逻辑松弛为迭代优化提供了微分方程视角。若将每次优化步骤视为软词元状态的微小更新，则迭代优化即成为朝向尖锐近单点分布的连续时间传输的显式数值离散化。这与近期离散流匹配 formulations 相连接——后者旨在学习可用较少优化步骤采样同时保持质量的连续时间流\citep{gat-etal:2024discrete,monsefi-etal:2025fs}。由此观之，扩散建模、基于流的建模与经典迭代优化可视为同一主题的变体，其主要差异在于：中间状态表示方式（硬词元 vs. 软分布）、更新集$\mathcal{U}$选择策略（调度 vs. 置信度）、以及动态过程框架（马尔可夫过程 vs. 通用学习优化算子）。
+\subsubsection{扩散变换器}
+
+离散扩散在自然语言处理领域变得具有竞争力的一个实际原因是其逆向动力学可以通过变换器进行参数化。该架构是当前最具可扩展性的骨干网络，在语言建模领域占据主导地位。术语 \textit{扩散变换器}（DiT）在视觉领域应用最为广泛，其中用变换器骨干网络替换 U-Net 能够产生强大的缩放行为 \citep{peebles-and-xie:2023scalable}。详细介绍变换器超出了本文的范围。我们建议感兴趣的读者参阅相关论文 \citep{vaswani-etal:2017attention,xiao-and-zhu:2023introduction}。
+
+在自然语言处理中，变换器提供了一种强大的机制，可以将一个词元序列编码为等长的实值表示序列。根据这些表示的定义和解释方式，此类模型可用于学习从输入词元序列到任意目标的映射。在扩散建模中，变换器必须被条件化于扩散时间 $t$（或离散索引）。这通常通过将学习到的时间嵌入注入到每一层来实现，例如，通过加性偏置，或与一个时间词元进行交叉注意力。网络的输出可以有多种解释方式，这取决于所选择的参数化方法。在连续空间扩散中，常见的选择包括预测得分 $\nabla_{\mathbf{s}} \log p_t(\mathbf{s})$、加性噪声 $\boldsymbol{\epsilon}$、去噪数据 $\mathbf{s}(0)$，或是线性组合上述变量的速度变量 \citep{ho-eatl:2020denoising,salimans-and-ho:2022progressive}。这些参数化方法会导致不同的离散化方案和稳定性特性，但本质上都可以视为学习一个时间索引的向量场，该向量场将概率质量从一个简单的基础分布输送到数据分布。
+\subsubsection{基于流的视角}
+
+鉴于 Transformer 提供的建模灵活性，我们无需局限于使用显式的基于似然的 ELBO（见公式~(\ref{eq:discrete-elbo})）来训练扩散模型。一个自然的替代方案是流匹配。在连续设定下，流匹配学习一个时间依赖的向量场，其常微分方程将一个简单的基分布输送到数据分布。对于语言而言，关键困难在于状态定义在离散的乘积空间 $V^n$ 上，因此流必须定义为要么是词元上概率质量的动态（离散状态视角），要么是定义在连续松弛（如概率单纯形或 logit 空间）上的常微分方程（连续状态视角）。最近的\textbf{离散流匹配}方法提供了这两种视角，并使它们在现代语言建模的规模下变得实用 \citep{gat-etal:2024discrete,campbell-etal:2024generative,shaul-etal:2025flow}。
+
+一个有用的起点是公式~(\ref{eq:simplex-forward-ode}) 中已经引入的单纯形表示。我们不将 $\mathbf{x}(t)$ 视为离散的词元序列，而是将中间状态视为每个位置的分类概率
+\begin{eqnarray}
+\mathbf{P}(t) & = & [\mathbf{p}_1(t), \dots, \mathbf{p}_n(t)]
+\in \mathbb{R}^{|V|\times n},
+\end{eqnarray}
+
+\noindent 其中
+\begin{eqnarray}
+\sum_{v\in V} \mathbf{p}_i(t)[v] & = &  1.
+\end{eqnarray}
+
+在这种表示下，流是定义在单纯形乘积空间上的一个常微分方程，
+\begin{eqnarray}
+\frac{d\mathbf{p}_i(t)}{dt} & = & \mathbf{v}_{\theta}(\mathbf{p}_i(t),t,\mathbf{c}), \\
+\sum_{v\in V}\mathbf{v}_{\theta}(\mathbf{p}_i(t),t,\mathbf{c})[v] & = & 0,
+\label{eq:dfm-simplex-ode}
+\end{eqnarray}
+其中切向约束确保了概率守恒。采样因此成为一个常微分方程积分问题，这与视觉领域类似：给定来自基分布的 $\mathbf{p}(T)$，反向积分公式~(\ref{eq:dfm-simplex-ode}) 以获得 $\mathbf{p}(0)$，并通过 $\arg\max$ 或分类采样解码出词元。
+
+剩下的任务是指定 $\mathbf{v}_\theta$ 的训练目标。离散流匹配通过定义一族在源分布和数据分布之间插值的概率路径来实现这一点，然后使模型向量场与这些路径诱导的瞬时概率速度相匹配。更具体地说，对于每个训练样本 $\mathbf{x}(0)$，定义 $V^n$ 上或每个词元边缘分布上的条件路径 $q_t(\cdot | \mathbf{x}(0), \mathbf{c})$，并抽取一个带噪样本 $\mathbf{x}(t)\sim q_t(\cdot | \mathbf{x}(0), \mathbf{c})$。流匹配的回归目标是沿着该路径的条件速度，
+\begin{eqnarray}
+\mathbf{v}^\star(\mathbf{x}(t),t,\mathbf{x}(0),\mathbf{c})
+& = &
+\frac{d \mathbb{E}\big[\mathbf{1}_{\mathbf{x}(t)} | \mathbf{x}(0), \mathbf{c} \big]}{dt},
+\label{eq:dfm-target-velocity}
+\end{eqnarray}
+
+\noindent 其中 $\mathbf{1}_{\mathbf{x}(t)}$ 是 $\mathbf{x}(t)$ 的独热表示。最终的目标函数与连续条件流匹配类似，区别在于状态和速度受到单纯形几何以及端点分类性质的约束。
+
+加噪核可以与之前讨论的扩散语言模型中使用的核非常相似。对于每个位置，我们可以定义一个在干净点质量和基分布 $\bar{p}_i(\cdot)$ 之间的时间依赖混合，
+\begin{eqnarray}
+q_t(x_i | x_i(0), \mathbf{c})
+& = &
+\alpha_t \cdot \mathbb{I}(x_i = x_i(0))
++
+(1-\alpha_t) \cdot \bar{p}_i(x_i),
+\label{eq:dfm-mixture-path}
+\end{eqnarray}
+其中调度 $\alpha_t$ 从 $1$ 递减到 $0$。这即使在样本路径是离散的情况下，也能在单纯形中诱导出一条平滑的概率路径。
+
+对公式~(\ref{eq:dfm-mixture-path}) 关于时间求导，得到目标速度的解析形式
+\begin{eqnarray}
+\mathbf{v}^\star_i(x_i(t), t, x_i(0), \mathbf{c})
+& = &
+\dot{\alpha}_t \cdot \big[ \mathbf{1}_{x_i(0)} - \bar{p}_i \big],
+\label{eq:dfm-analytic-velocity}
+\end{eqnarray}
+
+\noindent 其中 $\dot{\alpha}_t = d\alpha_t/dt$ 表示调度的时间导数。由于 $\alpha_t$ 随前向时间从 $1$ 递减到 $0$，故 $\dot{\alpha}_t\leq 0$。因此，该条件速度在前向加噪方向把概率质量从目标词元 $x_i(0)$ 移向基分布 $\bar{p}_i$；生成时则沿相反时间方向把概率质量移回目标词元。
+
+为了训练模型，我们需要一个仅依赖于时间 $t$ 时可用信息的条件速度。与标准流匹配一样，训练目标定义为
+\begin{eqnarray}
+\mathcal{L}_{\text{DFM}}(\theta)
+& = &
+\mathbb{E}_{t, \mathbf{x}(0), \mathbf{x}(t)} \left[ \left\| \mathbf{v}_\theta(\mathbf{x}(t), t, \mathbf{c}) - \mathbf{v}^\star(\mathbf{x}(t), t, \mathbf{x}(0), \mathbf{c}) \right\|^2 \right].
+\label{eq:dfm-objective}
+\end{eqnarray}
+
+上述单纯形常微分方程视角描述了一条连续的边缘分布曲线，但它没有指定在生成过程中离散样本应如何演化。一个互补的视角是通过一个由时间依赖的生成器矩阵 $\mathbf{Q}^{\mathrm{tok}}(t) \in \mathbb{R}^{|V| \times |V|}$ 参数化的连续时间马尔可夫链来表示离散流。边缘速度 $\mathbf{v}(t)$ 与生成器之间的联系由 Kolmogorov 前向方程给出
+\begin{eqnarray}
+\frac{d\mathbf{p}_i(t)}{dt} & = & \left[ \mathbf{Q}^{\mathrm{tok}}(t) \right]^\top \mathbf{p}_i(t),
+\label{eq:kolmogorov-forward}
+\end{eqnarray}
+其中 $\mathbf{p}_i(t)$ 是表示词元上概率分布的向量。通过为特定目标词元 $z$ 展开这个矩阵乘法，我们可以将速度解释为一个通量平衡方程
+\begin{eqnarray}
+\mathbf{v}_i(t)[z]
+& = &
+\sum_{y \neq z} \underbrace{\mathbf{p}_i(t)[y] Q^{\mathrm{tok}}_{yz}(t)}_{\text{inflow from } y \to z}
+-
+\sum_{y \neq z} \underbrace{\mathbf{p}_i(t)[z] Q^{\mathrm{tok}}_{zy}(t)}_{\text{outflow from } z \to y}.
+\label{eq:master-equation-Q}
+\end{eqnarray}
+
+\noindent 这里，$Q^{\mathrm{tok}}_{yz}(t)$ 表示从词元 $y$ 跳转到 $z$ 的瞬时速率。注意，对角线元素满足 $Q^{\mathrm{tok}}_{yy}(t) = - \sum_{z \neq y} Q^{\mathrm{tok}}_{yz}(t)$ 以确保概率守恒。
+
+虽然公式~(\ref{eq:dfm-analytic-velocity}) 导出的边缘速度 $\mathbf{v}^\star$ 固定了概率的净变化，但它并未唯一确定转移速率 $\mathbf{Q}^{\mathrm{tok}}$。为了描述从基分布返回目标词元的生成过程，引入反向时间 $\tau=T-t$，并令 $\alpha^\leftarrow_\tau=\alpha_{T-\tau}$。此时 $d\alpha^\leftarrow_\tau/d\tau=-\dot{\alpha}_{T-\tau}\geq0$。近期工作中一个常见选择是只允许非目标词元跳向目标样本 $x_i(0)$ \citep{campbell-etal:2024generative}，其条件目标速率为
+\begin{eqnarray}
+\widetilde Q^{\star,\mathrm{tok}}_{yz}(\tau\mid x_i(0))
+&=&
+\frac{d\alpha^\leftarrow_\tau/d\tau}{1-\alpha^\leftarrow_\tau}
+\cdot\mathbb{I}(z=x_i(0)),
+\qquad y\ne x_i(0),\quad \alpha^\leftarrow_\tau<1.
+\label{eq:target-Q}
+\end{eqnarray}
+
+\noindent 该式的非对角速率非负，因此定义了合法的生成器；其对角元取为对应行其余速率之和的负值，从而保证概率守恒。这个生成器驱动任何非目标词元 $y$ 直接跳转到目标 $x_i(0)$，并产生所需的反向边缘演化。
+
+因此，模型被参数化以预测这个生成器矩阵，训练目标也变成了速率匹配损失，而非公式~(\ref{eq:dfm-objective}) 中的向量回归。在生成过程中，可以使用 Gillespie 方法 \citep{gillespie:1977exact} 或 Tau-Leaping \citep{gillespie:2001approximate} 等算法模拟该过程，并执行离散跳转 $x(\tau) \to x(\tau+\Delta \tau)$，这些跳转在统计上遵循学习到的概率流。
+
+至此可以看到，连续时间并不要求状态本身连续：在连续状态空间中，
+ODE 以向量场规定局部速度，SDE 进一步加入随机扩散；在离散状态空间中，
+CTMC 则以生成器规定瞬时跳转速率。三类模型都通过局部动力学诱导
+随时间演化的概率分布，只是在状态表示、轨迹形式和数值模拟方式上有所不同。
+
+\begin{exercisebox}
+  \begin{enumerate}
+    \item 写出条件自回归模型和单步非自回归模型的概率分解，并比较二者关于序列长度的串行深度。为什么扩散式 NAR 的完整生成复杂度不能简单写成 \(O(1)\)？
+    \item 比较嵌入空间扩散中的显式长度预测、EOS 截断和动态长度适应。最近邻舍入为什么可能产生语义平均化问题？请给出两种缓解思路。
+    \item 连续时间马尔可夫链的生成器矩阵需要满足哪些条件？对二状态生成器 \(\boldsymbol Q=\bigl(\begin{smallmatrix}-2&2\\1&-1\end{smallmatrix}\bigr)\)，说明每个非对角元素和对角元素的含义。
+    \item 词表大小为 \(|V|=4\)，信号保留率为 \(\alpha_t=0.7\)。分别计算均匀扩散中原词元与任一其他词元的概率，以及吸收式掩码扩散中原词元与 \texttt{[MASK]} 的概率。
+    \item 从状态表示、局部动力学、训练目标和采样方法四个方面，比较嵌入空间扩散与词元空间离散扩散。若任务要求中间状态始终是合法词元，应优先选择哪条路线？为什么？
+  \end{enumerate}
+\end{exercisebox}
+
+
+\subsection{本章小结}

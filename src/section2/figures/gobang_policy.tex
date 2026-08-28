@@ -1,0 +1,177 @@
+\begin{tikzpicture}[
+    font=\small,
+    flow/.style={
+        draw=black,
+        -Latex,
+        line width=0.8pt
+    },
+    dashedflow/.style={
+        draw=black!75,
+        -Latex,
+        dashed,
+        line width=0.75pt
+    },
+    panel/.style={
+        draw=black,
+        rounded corners=4pt,
+        line width=0.8pt
+    },
+    titlebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=blue!5,
+        minimum height=0.75cm,
+        align=center
+    },
+    infobox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=gray!5,
+        align=center,
+        line width=0.8pt
+    },
+    blackstone/.style={
+        circle,
+        draw=black,
+        fill=black,
+        minimum size=6.5mm,
+        inner sep=0pt
+    },
+    whitestone/.style={
+        circle,
+        draw=black,
+        fill=white,
+        minimum size=6.5mm,
+        inner sep=0pt
+    },
+    cand/.style={
+        circle,
+        draw=orange!80!black,
+        fill=orange!20,
+        line width=0.9pt,
+        minimum size=7mm,
+        inner sep=0pt,
+        font=\bfseries
+    },
+    bestcand/.style={
+        circle,
+        draw=green!50!black,
+        fill=green!25,
+        line width=1.1pt,
+        minimum size=7.4mm,
+        inner sep=0pt,
+        font=\bfseries
+    },
+    rowbox/.style={
+        draw=black!30,
+        rounded corners=2pt,
+        minimum height=0.62cm,
+        align=left
+    }
+]
+
+% =========================
+% Left panel: board
+% =========================
+\draw[panel, fill=orange!8] (0.3,5.2) rectangle (5.9,11.0);
+\node[titlebox, minimum width=4.3cm] at (3.1,11.55) {当前棋盘状态 $s_t$};
+
+% board grid
+\draw[line width=0.8pt] (1,6) rectangle (5,10);
+\foreach \x in {1,2,3,4,5}{
+    \draw[line width=0.5pt] (\x,6) -- (\x,10);
+}
+\foreach \y in {6,7,8,9,10}{
+    \draw[line width=0.5pt] (1,\y) -- (5,\y);
+}
+
+% axis labels
+\node at (1,5.65) {6};
+\node at (2,5.65) {7};
+\node at (3,5.65) {8};
+\node at (4,5.65) {9};
+\node at (5,5.65) {10};
+
+\node at (0.55,6) {6};
+\node at (0.55,7) {7};
+\node at (0.55,8) {8};
+\node at (0.55,9) {9};
+\node at (0.55,10) {10};
+
+\node at (3.0,10.55) {\footnotesize 局部棋盘示意};
+
+% existing stones
+\node[blackstone] at (2,7) {};
+\node[blackstone] at (3,7) {};
+\node[blackstone] at (4,8) {};
+
+\node[whitestone] at (2,9) {};
+\node[whitestone] at (4,7) {};
+\node[whitestone] at (5,8) {};
+
+% candidate positions
+\node[cand] at (2,8) {A};
+\node[bestcand] at (3,8) {B};
+\node[cand] at (3,9) {C};
+\node[cand] at (4,9) {D};
+
+% legend
+\node[blackstone] at (1.2,5.1) {};
+\node[anchor=west] at (1.45,5.1) {\footnotesize 黑棋};
+
+\node[whitestone] at (2.4,5.1) {};
+\node[anchor=west] at (2.65,5.1) {\footnotesize 白棋};
+
+\node[cand, minimum size=5.8mm] at (3.7,5.1) {};
+\node[anchor=west] at (3.95,5.1) {\footnotesize 候选位置};
+
+\node[bestcand, minimum size=6.2mm] at (5.05,5.1) {};
+\node[anchor=west] at (5.3,5.1) {\footnotesize 采样动作};
+
+% =========================
+% Middle panel: policy model
+% =========================
+\draw[flow] (6.15,8.2) -- (7.3,8.2);
+\node at (6.72,8.55) {\footnotesize 状态输入};
+
+\draw[panel, fill=blue!4] (7.5,7.1) rectangle (10.8,9.3);
+\node[titlebox, minimum width=2.8cm] at (9.15,9.75) {策略模型};
+\node at (9.15,8.55) {$\pi_{\theta}(a\mid s_t)$};
+\node[align=center] at (9.15,7.75) {\footnotesize 输出合法动作的\\\footnotesize 概率分布};
+
+\draw[flow] (10.95,8.2) -- (12.1,8.2);
+\node at (11.52,8.55) {\footnotesize 概率输出};
+
+% =========================
+% Right panel: probability distribution
+% =========================
+\draw[panel, fill=green!5] (12.3,5.2) rectangle (18.5,11.0);
+\node[titlebox, minimum width=5.0cm] at (15.4,11.55) {落子概率分布};
+
+\draw[rowbox, fill=white] (12.8,10.1) rectangle (18.0,10.7);
+\node[anchor=west] at (13.05,10.4) {$A:(7,8)\qquad \pi_{\theta}(A\mid s_t)=0.15$};
+
+\draw[rowbox, fill=green!15] (12.8,9.15) rectangle (18.0,9.75);
+\node[anchor=west] at (13.05,9.45) {$B:(8,8)\qquad \pi_{\theta}(B\mid s_t)=0.40$};
+\node[anchor=west, text=green!40!black] at (16.95,9.45) {\footnotesize 概率最高};
+
+\draw[rowbox, fill=white] (12.8,8.2) rectangle (18.0,8.8);
+\node[anchor=west] at (13.05,8.5) {$C:(8,9)\qquad \pi_{\theta}(C\mid s_t)=0.25$};
+
+\draw[rowbox, fill=white] (12.8,7.25) rectangle (18.0,7.85);
+\node[anchor=west] at (13.05,7.55) {$D:(9,9)\qquad \pi_{\theta}(D\mid s_t)=0.20$};
+
+% bottom formula / note
+\draw[infobox] (12.8,5.85) rectangle (18.0,6.85);
+\node[align=center] at (15.4,6.48) {$a_t\sim\pi_{\theta}(\cdot\mid s_t)$};
+\node[align=center, text=green!40!black] at (15.4,6.1) {\footnotesize 按概率分布采样动作};
+
+% sampled action arrow from probability row B back to board B
+\draw[dashedflow]
+    (12.8,9.45)
+    .. controls (10.8,10.9) and (6.7,10.8)
+    .. (3,8.35);
+
+\node[text=green!40!black] at (8.0,10.45) {\footnotesize 本次采样选择位置 $B=(8,8)$};
+
+\end{tikzpicture}

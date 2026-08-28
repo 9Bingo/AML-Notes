@@ -1,0 +1,83 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\sep{0.6}
+\def\stepsize{1.3cm}
+\def\ycoordp{4}
+\def\vectorsize{1cm}
+\def\smallsize{0.13}
+
+\tikzstyle{snode} = [fig/module,minimum width=4.4cm,minimum height=0.8cm]
+\tikzstyle{cnode} = [minimum width=0.3cm,minimum height=\vectorsize]
+
+\begin{scope}
+
+\node [anchor=center] (x11) at (0,0) {\small{狐}};
+\node [anchor=center] (x12) at ([xshift=\stepsize]x11) {\small{狸}};
+\node [anchor=center] (x13) at ([xshift=2*\stepsize]x11) {\small{翻}};
+\node [anchor=center] (x14) at ([xshift=3*\stepsize]x11) {\small{过}};
+\node [anchor=center] (x15) at ([xshift=4*\stepsize,yshift=-1pt]x11) {\small{栅}};
+\node [anchor=center] (x16) at ([xshift=5*\stepsize]x11) {\small{栏}};
+\node [anchor=center] (x17) at ([xshift=6*\stepsize,yshift=-2pt]x11) {\small{。}};
+\node [anchor=center] (x1m1) at ([xshift=-\stepsize]x11) {\small{...}};
+\node [anchor=east] (x1label) at ([xshift=-0.4cm]x1m1) {\small{$(\mathbf{c},\mathbf{x}(0))$}};
+
+\node [anchor=center] (x21) at ([yshift=-2cm]x11) {\small{狐}};
+\node [anchor=center] (x22) at ([xshift=\stepsize]x21) {\small{\texttt{\color{blue} [MASK]}}};
+\node [anchor=center] (x23) at ([xshift=2*\stepsize]x21) {\small{翻}};
+\node [anchor=center] (x24) at ([xshift=3*\stepsize]x21) {\small{过}};
+\node [anchor=center] (x25) at ([xshift=4*\stepsize]x21) {\small{\texttt{\color{blue} [MASK]}}};
+\node [anchor=center] (x26) at ([xshift=5*\stepsize]x21) {\small{栏}};
+\node [anchor=center] (x27) at ([xshift=6*\stepsize,yshift=-2pt]x21) {\small{。}};
+\node [anchor=center] (x2m1) at ([xshift=-\stepsize]x21) {\small{...}};
+\node [anchor=east] (x2label) at ([xshift=-0.4cm]x2m1) {\small{$(\mathbf{c},\mathbf{x}(1))$}};
+
+\node [anchor=center] (x31) at ([yshift=-2cm]x21) {\small{\texttt{\color{blue} [MASK]}}};
+\node [anchor=center] (x32) at ([xshift=\stepsize]x31) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x33) at ([xshift=2*\stepsize]x31) {\small{翻}};
+\node [anchor=center] (x34) at ([xshift=3*\stepsize]x31) {\small{过}};
+\node [anchor=center] (x35) at ([xshift=4*\stepsize]x31) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x36) at ([xshift=5*\stepsize]x31) {\small{\texttt{\color{blue} [MASK]}}};
+\node [anchor=center] (x37) at ([xshift=6*\stepsize,yshift=-2pt]x31) {\small{。}};
+\node [anchor=center] (x3m1) at ([xshift=-\stepsize]x31) {\small{...}};
+\node [anchor=east] (x3label) at ([xshift=-0.4cm]x3m1) {\small{$(\mathbf{c},\mathbf{x}(2))$}};
+
+\node [anchor=center] (x41) at ([yshift=-2cm]x31) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x42) at ([xshift=\stepsize]x41) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x43) at ([xshift=2*\stepsize]x41) {\small{\texttt{\color{blue} [MASK]}}};
+\node [anchor=center] (x44) at ([xshift=3*\stepsize]x41) {\small{过}};
+\node [anchor=center] (x45) at ([xshift=4*\stepsize]x41) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x46) at ([xshift=5*\stepsize]x41) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x47) at ([xshift=6*\stepsize]x41) {\small{\texttt{\color{blue} [MASK]}}};
+\node [anchor=center] (x4m1) at ([xshift=-\stepsize]x41) {\small{...}};
+\node [anchor=east] (x4label) at ([xshift=-0.4cm]x4m1) {\small{$(\mathbf{c},\mathbf{x}(3))$}};
+
+\node [anchor=center] (x51) at ([yshift=-2cm]x41) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x52) at ([xshift=\stepsize]x51) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x53) at ([xshift=2*\stepsize]x51) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x54) at ([xshift=3*\stepsize]x51) {\small{\texttt{\color{blue} [MASK]}}};
+\node [anchor=center] (x55) at ([xshift=4*\stepsize]x51) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x56) at ([xshift=5*\stepsize]x51) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x57) at ([xshift=6*\stepsize]x51) {\small{\texttt{[MASK]}}};
+\node [anchor=center] (x5m1) at ([xshift=-\stepsize]x51) {\small{...}};
+\node [anchor=east] (x5label) at ([xshift=-0.4cm]x5m1) {\small{$(\mathbf{c},\mathbf{x}(4))$}};
+
+\draw [->,line width=1.2pt] ([yshift=-0.2cm]x14.south) -- ([yshift=0.2cm]x24.north) node [pos=0.5,xshift=-0.2cm,left,align=right] {\footnotesize{将词元替换为}\\[-2pt] \footnotesize{\texttt{[MASK]}}};
+\draw [->,line width=1.2pt] ([yshift=-0.2cm]x24.south) -- ([yshift=0.2cm]x34.north);
+\draw [->,line width=1.2pt] ([yshift=-0.2cm]x34.south) -- ([yshift=0.2cm]x44.north);
+\draw [->,line width=1.2pt] ([yshift=-0.2cm]x44.south) -- ([yshift=0.2cm]x54.north);
+
+\draw [decorate,decoration={brace,amplitude=5pt,mirror,raise=0}]  ([xshift=0.1cm,yshift=0.6cm]x17.east) -- ([xshift=-0.1cm,yshift=0.6cm]x11.west) node[midway,yshift=0.6cm,align=left] (x0labelabove) {\footnotesize{原始序列 $\mathbf{x}(0)$}};
+
+\draw [->] ([yshift=0.2cm]x1m1.north) -- ([yshift=0.7cm]x1m1.north) node [pos=1,above,yshift=0.15cm] {\footnotesize{上下文 $\mathbf{c}$}};
+
+\draw [decorate,decoration={brace,amplitude=5pt,mirror,raise=0}]  ([xshift=-0.1cm,yshift=-0.6cm]x51.west) -- ([xshift=0.1cm,yshift=-0.6cm]x57.east) node[midway,yshift=-0.6cm,align=left] (x5labelbelow) {\footnotesize{全掩码序列 $\mathbf{x}(T)\ (T=4)$}};
+
+\draw [->] (x36.north east) .. controls +(east:0.7cm) and +(east:0.7cm) .. (x26.south east) node [pos=0.5,right,align=left] {\scriptsize{训练时，模型学习}\\[-2pt] \scriptsize{恢复原始词元}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

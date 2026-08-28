@@ -1,0 +1,478 @@
+\section{提示学习方法}
+
+\subsection{Zero/One/Few-Shot 提示方法}
+
+在与大语言模型交互时，我们输入的文本称为提示（prompt），模型据此生成回复。基于同一个预训练模型，只需更换提示即可完成翻译、问答、写作等多种任务，无需重新训练。本节旨在介绍提示设计的基本方法与思路，帮助读者更有效地利用大语言模型完成下游任务。
+
+根据提示中包含的示例数量，可将其大致划分为三类：零样本（zero-shot，不提供示例）、单样本（one-shot，提供一个示例）和少样本（few-shot，提供多个示例）。本节将围绕这三类方法展开讨论。需要说明的是，提示的实际效果与最佳表述方式往往因模型而异，因此本文不针对特定大语言模型，而是总结一些具有通用性的指导原则。
+
+\subsubsection{提示的基本概念}
+
+在深入介绍这三类提示方法之前，我们先明确提示的基本概念及其构造方式。“提示”一词含义多样，在本章中，我们将其定义为LLM的输入文本，记作$\mathbf{x}$。LLM在给定输入$\mathbf{x}$的条件下，通过最大化概率$\Pr(\mathbf{y}\mid\mathbf{x})$生成输出文本$\mathbf{y}$。提示作为生成条件，可以包含任何有助于描述问题和提供信息的内容。
+
+提示通常通过提示模板（简称模板）\cite{liu-etal:2023pre}获得。模板是一段含有占位符或变量的文本，各占位符可填入具体信息。以下展示两个向LLM征求周末建议的模板示例：
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+
+\hspace{2em} 请给我一些有趣的周末建议。
+
+\hspace{2em} \underline{\hspace{2em}}
+\end{tcolorbox}
+\vspace{0.5em}
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+
+\hspace{2em} 如果 $\{*\mathrm{premise}*\}$，你有什么有趣的周末建议吗？
+
+\hspace{2em} \underline{\hspace{2em}}
+\end{tcolorbox}
+\vspace{0.5em}
+
+第一个模板直接请求建议，因此不含变量；第二个模板中，变量$\{*\mathrm{premise}*\}$需由用户指定，作为给出建议的前提条件。例如，若输入：
+\begin{eqnarray}
+\mathrm{premise} & = & \text{这个周末天气很好} \nonumber
+\end{eqnarray}
+则可生成如下提示：
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+
+\hspace{2em} 如果这个周末天气很好，
+
+\hspace{2em} 你有什么有趣的周末建议吗？
+
+\hspace{2em} \underline{\hspace{2em}}
+\end{tcolorbox}
+\vspace{0.5em}
+
+除了自由格式的文本，另一种常见做法是采用“名称: 内容”的结构组织提示，明确标识问题与答案的位置。例如，用“问”和“答”分别表示问题与答案，可构建如下问答模板：
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+
+\hspace{2em} 问：$\{*\mathrm{question}*\}$
+
+\hspace{2em} 答：\underline{\hspace{2em}}
+
+\end{tcolorbox}
+\vspace{0.5em}
+
+这种“问: ... 答: ...”结构既可单独使用，也可重复多次并填入具体的问答实例，从而构成后文将要介绍的小样本提示的基本形式。
+
+除了直接描述任务，许多提示还会包含一段系统信息（system message），用于设定模型的角色、能力与行为约束。系统信息帮助LLM更好地理解当前任务的背景，从而生成更符合预期的回复。以下是一个语法纠错任务的提示，其中第一条语句便是系统信息：
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+
+\begingroup
+\renewcommand{\arraystretch}{1.0}
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{r l}
+{\color{gray} \footnotesize{系统}} & 你是一位乐于助人的助手，擅长语法纠正。 \\ [0.2cm]
+{\color{gray} \footnotesize{用户}}  & 请将下面的句子修改为语法正确的英文： \\ [0.1cm]
+ & 输入：She don't like going to the park. \\
+ & 输出：\underline{\hspace{2em}}
+\end{tabular}
+\endgroup
+
+\end{tcolorbox}
+\vspace{0.5em}
+
+上述提示中没有给出任何示例，仅凭指令和系统信息引导模型完成任务。这种不提供示例、直接要求模型解决问题的提示方式，即为零样本提示。关于这一方法的更多讨论，以及通过增加示例实现的单样本和少样本学习，将在下一节详细展开。
+
+\subsubsection{上下文学习}
+
+学习可以在推理过程中发生。上下文学习（in-context learning）正是这样一种方法：提示中包含若干问题求解的演示，LLM从这些演示中“学习”如何解决新问题。由于这一过程不更新模型参数，上下文学习可被视为无需额外训练或微调，便能有效激活和重组预训练知识的手段。这使得LLM能够快速适应新任务，拓展了预训练模型在无任务特定调整下的能力边界。
+
+我们可以通过对比零样本学习、单样本学习和少样本学习来具体说明上下文学习。在上一节中，我们已经看到了一个语法纠错的零样本学习示例——它直接要求模型纠正句子，不提供任何示例。在单样本学习中，我们添加一个已完成的纠错示例作为演示，让LLM从这个新增的经验中学习：
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+
+\begingroup
+\renewcommand{\arraystretch}{1.0}
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{r l}
+{\color{gray} \footnotesize{系统}} & 你是一位乐于助人的助手，擅长语法纠正。 \\ [0.2cm]
+{\color{gray} \footnotesize{用户}}  & 请将下面的句子修改为语法正确的英文： \\ [0.1cm]
+ & 输入：There is many reasons to celebrate. \\
+ & 输出：There are many reasons to celebrate. \\ [0.2cm]
+{\color{gray} \footnotesize{用户}}  & 请将下面的句子修改为语法正确的英文： \\ [0.1cm]
+ & 输入：She don't like going to the park. \\
+ & 输出：\underline{\hspace{2em}}
+\end{tabular}
+\endgroup
+
+\end{tcolorbox}
+\vspace{0.5em}
+
+在此基础上增加更多演示，便构成少样本学习：
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame empty]
+
+\begingroup
+\renewcommand{\arraystretch}{1.0}
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{r l}
+{\color{gray} \footnotesize{系统}} & 你是一位乐于助人的助手，擅长语法纠正。 \\ [0.2cm]
+{\color{gray} \footnotesize{用户}}  & 请将下面的句子修改为语法正确的英文： \\ [0.1cm]
+ & 输入：There is many reasons to celebrate. \\
+ & 输出：There are many reasons to celebrate. \\ [0.2cm]
+{\color{gray} \footnotesize{用户}}  & 请将下面的句子修改为语法正确的英文： \\ [0.1cm]
+ & 输入：Me and my friend goes to the gym every day. \\
+ & 输出：My friend and I go to the gym every day. \\ [0.2cm]
+{\color{gray} \footnotesize{用户}}  & 请将下面的句子修改为语法正确的英文： \\ [0.1cm]
+ & 输入：She don't like going to the park. \\
+ & 输出：\underline{\hspace{2em}}
+\end{tabular}
+\endgroup
+
+\end{tcolorbox}
+\vspace{0.5em}
+
+在少样本学习中，我们实质上提供了一个从输入到输出的映射模式，LLM尝试遵循这一模式进行预测。上下文学习的有效性在很大程度上依赖于提示质量和模型的基础能力：一方面，我们需要通过提示工程精心设计演示内容，以帮助模型更有效地从中学习；另一方面，能力更强的LLM往往能更好地利用上下文学习执行新任务。例如，若希望LLM将因纽特语翻译为英语，但模型在预训练阶段严重缺乏因纽特语数据，那么无论怎样设计提示，都很难获得高质量的翻译。此时，更好的策略是用更多相关数据继续训练模型，而非一味优化提示。
+
+关于上下文学习为何在预训练过程中涌现，以及为何在推理时起作用，一个直观的理解是：预训练模型已经获得了解决问题的能力，但面对新问题时可能同时存在多种合理的预测路径。提供演示可以引导模型遵循“正确”的路径。此外，研究者也从贝叶斯推断 \cite{xie-etal:2022an}、梯度下降 \cite{dai-etal:2023can,von-etal:2023transformers}、线性回归 \cite{akyurek-etal:2023what} 和元学习 \cite{garg-etal:2022can} 等角度对上下文学习进行了理论解释。
+
+\subsection{进阶提示方法}
+\label{sec:advanced-prompting}
+
+\noindent 我们已经介绍了与 LLM 提示相关的基本概念，并展示了许多用于 NLP 任务的提示。现在我们来探讨几种增强提示有效性的技术。
+
+\subsubsection{提示工程策略}
+
+\noindent 设计提示是高度经验性的。总的来说，对于同一任务，有很多方法可以提示LLM，我们需要进行多次试错才能找到一个令人满意的提示。为了更高效地编写好的提示，可以遵循某些策略。常见的提示原则示例包括：
+
+\begin{itemize}
+\item \vspace{0.5em} \textbf{尽可能清晰地描述任务}。当我们应用LLM解决问题时，我们需要提供对问题的精确、具体、清晰的描述，并指示LLM按照我们的期望执行。当我们希望LLM的输出满足某些期望时，这一点尤其重要。例如，假设我们对气候变化感到好奇。一个要求LLM提供一些信息的简单提示是
+
+    \vspace{0.5em}
+    \begin{tcolorbox}[frame empty]
+
+    \hspace{2em} 告诉我关于气候变化的信息。
+
+    \hspace{2em} \underline{\hspace{2em}}
+
+    \end{tcolorbox}
+    \vspace{0.5em}
+
+    由于这个指令太过笼统，LLM可能会生成一个涉及气候变化任何方面的回应，而这可能与我们的特定兴趣不符。在这种情况下，我们可以使用更具体、更详细的提示。现在，假设我们打算向一个10岁的孩子解释气候变化。一个这样的例子是
+
+    \vspace{0.5em}
+    \begin{tcolorbox}[frame empty]
+
+    \begingroup
+    \setlength{\leftskip}{2em}
+    \setlength{\rightskip}{2em}
+
+    向一个10岁的孩子解释气候变化的原因和影响。谈谈它如何影响天气、海平面和气温。同时，提及人们正在做的一些有助于解决问题的事情。请尝试用简单的语言解释，并且不超过500个词。
+
+    \underline{\hspace{2em}}
+
+    \endgroup
+
+    \end{tcolorbox}
+    \vspace{0.5em}
+
+\item \vspace{0.3em} \textbf{引导LLM思考}。LLM已经展现出了惊人的“思考”能力。一个常见的例子是，发展成熟的LLM在被认为极具挑战性的数学推理任务中取得了令人印象深刻的表现。在提示工程中，LLM的“思考”能力需要通过适当的提示来激活，特别是对于那些需要大量推理的问题。在许多情况下，被指示“思考”的LLM与被指示直接执行任务的同一个LLM相比，可以产生完全不同的结果。例如，\citet{kojima-etal:2022large}发现，仅仅在每个提示的末尾附加“Let's think step by step”就可以提高LLM在多个推理任务上的性能。有多种方法可以提示LLM进行“思考”。一种方法是指示LLM在得出最终答案之前，生成推理问题的步骤。例如，考虑一个解决数学问题的任务。下面是该任务的一个简单提示。
+
+    \vspace{0.5em}
+    \begin{tcolorbox}[frame empty]
+
+    \begingroup
+    \setlength{\leftskip}{2em}
+    \setlength{\rightskip}{2em}
+
+    你是一位数学家。你将收到一个数学问题。请解决这个问题。
+
+    \underline{\hspace{2em}}
+
+    \endgroup
+
+    \end{tcolorbox}
+    \vspace{0.5em}
+
+    由于解决数学问题需要详细的推理过程，如果LLM试图直接得出答案，很可能会犯错。因此，我们可以明确要求LLM在得出结论之前遵循给定的推理过程。
+
+    \vspace{0.5em}
+    \begin{tcolorbox}[frame empty]
+
+    \begingroup
+    \setlength{\leftskip}{2em}
+    \setlength{\rightskip}{2em}
+
+    你是一位数学家。在解决数学问题时，你将遵循以下详细的推理步骤。
+
+    \vspace{0.5em}
+
+    第1步：问题解读。
+
+    数学家仔细倾听你的问题，并理解你提出的数学挑战的复杂细节。
+
+    \vspace{0.5em}
+
+    第2步：策略制定。
+
+    数学家凭借其渊博的知识，选择针对特定类型数学问题（无论是代数、微积分还是几何）的最有效策略。
+
+    \vspace{0.5em}
+
+    第3步：详细计算。
+
+    数学家以精准和专业的方式，逐步执行必要的计算，并遵守所有数学原则。
+
+    \vspace{0.5em}
+
+    第4步：解答回顾。
+
+    在提供最终答案之前，数学家会仔细检查计算的准确性，并为解答提供简洁的解释或理由。
+
+    \vspace{0.5em}
+
+    你将收到一个数学问题。请解决这个问题。
+
+    \vspace{0.5em}
+
+    $\{*\mathrm{problem}*\}$
+
+    \vspace{0.5em}
+
+    \underline{\hspace{2em}}
+
+    \endgroup
+
+    \end{tcolorbox}
+    \vspace{0.5em}
+
+    另一种方法是通过多轮交互，先让模型给出初步答案，再提示其评估、修正，从而引出更可靠的最终结果。
+
+\item \vspace{0.3em} \textbf{提供参考信息}。如前一节所述，我们可以在提示中包含示例，让LLM通过这些示例进行情境学习，从而了解如何执行任务。事实上，鉴于LLM卓越的语言理解能力，我们可以在提示中加入任何类型的文本，这样模型就可以基于更丰富的上下文进行预测。在许多应用中，我们拥有与用户查询相关的各种信息。我们通常不希望LLM进行无约束的预测，而是希望LLM生成的输出局限于相关文本。一个这样的例子是RAG，其中用户查询的相关文本是通过调用IR系统提供的，然后我们提示LLM基于这些提供的相关文本生成回应。下面的提示展示了一个例子。
+
+    \vspace{0.5em}
+    \begin{tcolorbox}[frame empty]
+
+    \begingroup
+    \setlength{\leftskip}{2em}
+    \setlength{\rightskip}{2em}
+
+    你是一位能为输入查询生成答案的专家。现在你收到了一个查询和相应的上下文信息。请基于此上下文信息生成答案。注意，你需要用自己的话来提供答案，而不是简单地从提供的上下文中复制。
+
+    \vspace{0.5em}
+
+    上下文信息: $\{*\mathrm{IR\textrm{-}result}*\}$
+
+    \vspace{0.3em}
+
+    查询: $\{*\mathrm{query}*\}$
+
+    \vspace{0.3em}
+
+    \underline{\hspace{2em}}
+
+    \endgroup
+
+    \end{tcolorbox}
+    \vspace{0.5em}
+
+    在处理现实世界的问题时，我们通常拥有有助于产生更好答案的先验知识和额外信息。在提示中考虑这些信息通常有助于改善结果。当上下文足够可靠时，甚至可以要求模型仅基于给定文本回答，避免幻觉。
+
+\end{itemize}
+\vspace{0.5em}
+
+上面，我们只讨论了几种编写好提示的策略。此外，提示的呈现格式（如使用字段、引号或代码风格）也对结果有显著影响，这些细节需要在实践中不断体会。当然，还有很多这样的方法，需要通过实践来形成自己的方法。感兴趣的读者可以参考各种在线文档以获取更多信息，例如OpenAI关于GPT系列模型的手册\footnote{参见 \url{https://platform.openai.com/docs/guides/prompt-engineering/six-strategies-for-getting-better-results}。}。
+
+\subsubsection{思维链}
+\label{sec:chain-of-thought}
+
+\noindent 思维链（\mindex{CoT}）使 LLM 能够针对复杂问题生成逐步的推理过程，从而以更接近人类认知的方式处理任务。与直接输出结论不同，CoT 要求 LLM 自行产生推理步骤，或从提示中给出的详尽推理演示中学习。为具体说明 CoT，不妨考虑文献中常用的一类代数计算问题。设问题为：
+
+\vspace{0.8em}
+
+\hspace{5em} \textit{计算数字 2、4 和 6 的平均值。}
+
+\vspace{0.8em}
+
+\noindent 可直接将该问题作为输入，提示 LLM 作答。
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame style={draw=none}]
+\begingroup
+\setlength{\leftskip}{2em}
+\setlength{\rightskip}{2em}
+
+Q: Please calculate the average of the numbers $2$, $4$, and $9$.
+
+\vspace{0.3em}
+
+A: \underline{The answer is $6$.}
+
+\endgroup
+\end{tcolorbox}
+\vspace{0.5em}
+
+此时 LLM 通常难以直接给出正确结果。一种简单的改进措施是在提示中加入同类问题的问答示例，使 LLM 从中获得参照。
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame style={draw=none}]
+\begingroup
+\setlength{\leftskip}{2em}
+\setlength{\rightskip}{2em}
+
+Q: Please calculate the average of the numbers $1$, $3$, $5$, and $7$.
+
+\vspace{0.3em}
+
+A: The answer is $4$.
+
+\vspace{0.7em}
+
+Q: Please calculate the average of the numbers $2$, $4$, and $9$.
+
+\vspace{0.3em}
+
+A: \underline{The answer is $7$.}
+
+\endgroup
+\end{tcolorbox}
+\vspace{0.5em}
+
+然而，仅提供问答对仍不足以使 LLM 掌握正确的推理方式。CoT 方法的核心理念在于，LLM 不仅学习问题和答案之间的映射关系，还能从推导答案所涉及的详细步骤中获益。为此，可在提示中加入若干推理步骤，构造 CoT 风格的提示。
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame style={draw=none}]
+\begingroup
+\setlength{\leftskip}{2em}
+\setlength{\rightskip}{2em}
+
+Q: Please calculate the mean square of the numbers 1, 3, 5, and 7.
+
+\vspace{0.3em}
+
+A: \textcolor[RGB]{154,245,175}{Calculate the square of each number: $1^2 = 1$, $3^2=9$, $5^2=25$, and $7^2=49$. Sum the squares, $1+9+25+49=84$. There are $4$ numbers in total. Divide the sum by the number of items, $84 / 4 = 21$.} The answer is $21$.
+
+\vspace{0.7em}
+
+Q: Please calculate the average of the numbers $2$, $4$, and $9$.
+
+\vspace{0.3em}
+
+A: \underline{\textcolor[RGB]{154,245,175}{Calculate $2 + 4 + 9$, which equals $15$. There are three numbers. Divide the}}
+
+\underline{\textcolor[RGB]{154,245,175}{total sum by the count, resulting in $15/3=5$.} The answer is $5$.}
+
+\endgroup
+\end{tcolorbox}
+\vspace{0.5em}
+
+\noindent 上例中以绿色标示的部分即为推理步骤。通过展示同类问题的完整推理过程，LLM 得以学会如何进行逻辑推导，从而生成通向正确答案的解题路径。
+
+\begin{importantnote}
+思维链（CoT）是提升复杂推理最有效的提示技巧，其本质是强制模型生成中间推理步骤，将多步问题拆解为可验证的序列。无论是少样本（提供推理示例）还是零样本（添加“逐步思考”指令），都能显著提高数学、逻辑等任务的正确率。关键在于确保推理步骤完整且连贯，而非仅关注最终答案。
+\end{importantnote}
+
+CoT 提示在实际应用中表现出若干优势。其一，CoT 将复杂问题拆解为一系列顺序化的子步骤，这一过程在一定程度上模拟了人类解决复杂问题的行为模式，因此尤其适用于需要多步推理的任务。其二，CoT 使推理过程更加透明，所有中间步骤均可见，便于使用者理解并解释结论的形成依据。其三，当使用者能够看到并理解推理逻辑时，其对模型输出的信任度往往会提高，这在医学、教育和金融等对可解释性要求较高的领域尤为重要。
+
+上述方法需要提供一个或多个包含推理步骤的示例，通常称为少样本 CoT。与之相对，零样本 CoT 无需提供示例，而是通过在提示中加入特定指令，要求 LLM 执行逐步推理。例如，下面给出一个零样本 CoT 提示的实例。
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame style={draw=none}]
+\begingroup
+\setlength{\leftskip}{2em}
+\setlength{\rightskip}{2em}
+
+Q: Please calculate the average of the numbers $2$, $4$, and $9$.
+
+\vspace{0.3em}
+
+A: \textcolor[RGB]{154,245,175}{Let's think step-by-step.}
+
+\vspace{0.3em}
+
+\uline{We have three numbers: $2$, $4$, and $9$. Add these numbers together, $2+4+9=15$. Determine how many numbers there are, which in this case is three. The average is calculated by dividing the total sum by the number of elements. Completing the division gives $15/3 = 5$. So the answer is $5$.}
+
+\endgroup
+\end{tcolorbox}
+\vspace{0.5em}
+
+在“让我们一步一步思考”这一指令的引导下，LLM 被要求生成详细的推理步骤。\citet{kojima-etal:2022large} 的研究指出，此类指令有时会使 LLM 只输出推理过程而不给出最终结论。此时，可通过第二轮提示将第一轮的输入和输出结合，再交由 LLM 继续生成，从而提取出正确答案。此外，除“一步一步思考”外，其他类似指令（如“请先展示思考过程”或“让我们有逻辑地分析”）同样可用于引导推理。
+
+在结束本节之前，有必要审视 CoT 在实际应用中面临的若干局限。其一，少样本 CoT 依赖高质量的多步推理示例，而这些示例的获取（无论是自动还是手动）均存在一定难度。其二，缺乏将复杂问题分解为适当子步骤的标准方法论，这在很大程度上依赖于使用者的经验。其三，中间步骤的累积错误可能对最终结论的准确性产生不利影响。关于 CoT 优缺点更为全面的讨论，可参考近年来的综述文献 \cite{chu-etal:2023survey,yu-etal:2023towards,zhang-etal:2023igniting}。
+
+\subsection{学习提示}
+\label{sec:learning-prompts}
+
+\noindent 前面介绍的提示策略均为人工设计。手工设计高质量提示不仅费力，而且存在明显局限：第一，不同大语言模型对提示的敏感程度各异，要找到通用而有效的提示往往需要大量试错，成本高昂；第二，完全依赖人类直觉容易遗漏那些不太直观但可能十分有效的提示，限制了提示的多样性；第三，人工编写的提示时常复杂冗长，既增加了推理计算开销，也不一定带来性能增益。
+
+为克服这些问题，研究者提出了一系列自动学习提示的技术，目标是自动创建、优化和表示提示，以便更高效地解决下游任务。围绕这一目标，本节讨论以下两个核心问题：
+
+\begin{itemize}
+\item 如何为语言模型自动设计和优化提示？
+\item 除文本字符串外，提示是否还有其他表示形式？如何学习这些表示？
+\end{itemize}
+
+\subsubsection{提示优化}
+\label{sec:prompt-optimization}
+
+\noindent 自动提示优化的目标是用算法发现针对特定任务的最优离散提示，这可以视为\mindex{自动机器学习} (AutoML) 的一种实例，与\mindex{神经架构搜索} (NAS) 的思路颇为相似。一个通用的提示优化框架通常包含三个关键组件：
+
+\begin{itemize}
+\item \textbf{提示搜索空间}。定义所有可供探索的提示。例如，可以围绕若干种子提示，通过编辑、扩展等方式生成多样化的候选。
+\item \textbf{性能评估}。对每个候选提示，将其送入语言模型并在验证集上衡量下游任务表现，以此作为提示质量的度量。
+\item \textbf{搜索策略}。决定如何遍历搜索空间。通常采用迭代方式：每一步选取当前最有希望的一组提示进行评估，并据此生成新的候选，循环往复，直至输出表现最佳的提示。
+\end{itemize}
+
+目前广泛使用的一类方法利用大语言模型自身来实现上述组件，形成\mindex{基于大语言模型的提示优化}。以 \citet{zhou-etal:2023large} 的工作为例，该方法交替执行以下步骤：
+
+\begin{itemize}
+\item \textbf{初始化}。构造候选提示池。既可以由人工编写少量初始提示，也可以借助语言模型，根据任务描述或少量输入-输出示例自动生成初始提示。
+\item \textbf{评估}。将候选池中的每个提示喂给语言模型，在验证集上计算预定义的性能指标（如准确率或对数似然），得到对应的质量分数。
+\item \textbf{修剪}。若候选池过大，可依据评估分数保留得分较高的一部分提示，舍弃其余，以减轻后续步骤的计算负担。
+\item \textbf{扩展}。以当前保留的提示为基础，利用语言模型生成语义相近或有变化的新提示（例如通过改写、局部编辑等方式），并加入候选池，从而不断探索更广的搜索空间。
+\end{itemize}
+
+评估、修剪、扩展三步可以反复进行，使系统在迭代中逐步发现更优的提示。扩展阶段的具体实现可以多种多样：它既可以是对提示进行释义或施加编辑操作，也可以引入反馈-修订循环，让语言模型根据输出质量对提示进行自我修正。但无论形式如何变化，核心理念始终一致——将提示设计转化为一个可由语言模型驱动的搜索与优化问题。
+
+需要指出的是，提示实际上具有结构化特征，通常包含指令、示例等多个组成部分。目前大多数自动提示优化工作侧重于学习更好的\textbf{指令}，即生成能有效引导模型完成任务的文本说明；同时，研究也在向自动选择或生成示例等方向延伸。
+
+\subsubsection{软提示}
+\label{sec:soft-prompts}
+
+\noindent 自然语言提示（即硬提示）虽然直观，但往往冗长且计算开销大，反复输入相同长提示更是低效。注意到硬提示作为离散 token 序列，实际上会被大语言模型编码为连续向量，这引出一个自然的问题：能否直接使用这些连续表示作为更紧凑的提示？为此，我们引入 \mindex{软提示}（soft prompt）的概念，视其为提示的隐藏、分布式表示。与人类可读的硬提示不同，软提示是模型内部的、可适应的隐式模式，以实值向量形式存在，更便于模型处理。
+
+\vspace{0.5em}
+\begin{tcolorbox}[frame style={draw=none}]
+\begingroup
+\setlength{\leftskip}{2em}
+\setlength{\rightskip}{2em}
+
+Translate the sentence into Chinese.
+
+\vspace{0.5em}
+
+Consider it done!
+
+\vspace{0.5em}
+
+\underline{\hspace{2em}}
+
+\endgroup
+\end{tcolorbox}
+\vspace{0.5em}
+
+\begin{figure}[!t]
+\centering
+\input{figures/Chapter2/figure-hard-prompt-and-soft-prompt}
+\caption{硬提示与软提示示意图。这里，硬提示是我们为了执行任务而输入给 LLM 的指令。LLM 正常对该指令进行编码，其对应的中间表示可被视为一种软提示。}
+\label{fig:hard-and-soft-prompt-examples}
+\end{figure}
+
+\noindent 例如，提示 ``Translate the sentence into Chinese.'' 可视为硬提示，其 token 序列经 LLM 转换为向量序列 $\mathbf{h}_1...\mathbf{h}_5$，这些向量即可看作一种软提示（图 \ref{fig:hard-and-soft-prompt-examples}）。但软提示不必来自自然语言的翻译；它们可以完全脱离具体文本，直接作为连续参数学习得到。这样的表示密集、低维且可优化，训练和推理成本远低于长硬提示，在重复使用同一提示的场景中尤为实用。
+
+上述思想催生了一系列通过学习连续向量来高效适配大语言模型的方法。典型代表是参数高效微调中的软提示：\textbf{前缀微调}（prefix tuning）在每一 Transformer 层的输入前添加可训练的前缀向量作为软提示~\cite{li-liang:2021prefix}；\textbf{提示微调}（prompt tuning）则仅在嵌入层加入可学习的软提示嵌入，而保持模型其余参数不变~\cite{lester-etal:2021power}。这些软提示通过与原有表示交互，将任务知识注入模型，以极低的参数成本实现适配。
+
+另一类方法从上下文压缩的视角学习软提示。为替代冗长的指令或示例，可将完整上下文压缩为少量连续向量（软提示），并通过知识蒸馏或循环聚合训练得到。例如，\citet{chevalier-etal:2023adapting} 将长上下文划分为片段，逐步使用摘要 token 累积记忆，最终生成固定大小的软提示表示整个上下文。此类压缩表示进一步拓展了软提示在高效推理中的应用。
+
+总而言之，软提示架起了高效计算与灵活任务适配的桥梁，已成为提示工程与参数高效微调的核心概念之一。

@@ -1,0 +1,125 @@
+\begin{tikzpicture}[
+    font=\small,
+    box/.style={
+        draw=black,
+        rounded corners=4pt,
+        minimum width=2.8cm,
+        minimum height=1.0cm,
+        align=center,
+        line width=0.8pt
+    },
+    statebox/.style={
+        box,
+        fill=yellow!12,
+        minimum width=3.2cm,
+        minimum height=2.2cm
+    },
+    actorbox/.style={
+        box,
+        fill=blue!10,
+        minimum width=4.0cm,
+        minimum height=2.1cm
+    },
+    criticbox/.style={
+        box,
+        fill=green!12,
+        minimum width=4.2cm,
+        minimum height=2.1cm
+    },
+    tdbox/.style={
+        box,
+        fill=gray!10,
+        minimum width=6.2cm,
+        minimum height=1.8cm
+    },
+    note/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=gray!5,
+        minimum width=3.8cm,
+        minimum height=0.95cm,
+        align=center,
+        line width=0.8pt
+    },
+    flow/.style={
+        draw=black,
+        -Latex,
+        line width=0.8pt
+    },
+    dashedflow/.style={
+        draw=black!80,
+        -Latex,
+        dashed,
+        line width=0.75pt
+    }
+]
+
+% =========================
+% Top: two states
+% =========================
+\node[statebox] (s0) at (2.2,4.8) {
+    落子前状态 $s_t$\\[0.15cm]
+    Critic 估计\\[0.08cm]
+    $V_{\phi}(s_t)=4.0$
+};
+
+\node[statebox] (s1) at (10.8,4.8) {
+    落子后状态 $s_{t+1}$\\[0.15cm]
+    Critic 估计\\[0.08cm]
+    $V_{\phi}(s_{t+1})=6.0$
+};
+
+% action arrow
+\draw[flow] (s0.east) -- (s1.west);
+\node[align=center] at (6.5,5.35) {Actor 选择动作\\$a_t=B=(8,8)$};
+\node at (6.5,4.3) {即时奖励 $r_t=0$};
+
+% =========================
+% Middle: TD error
+% =========================
+\node[tdbox] (td) at (6.5,2.0) {
+    时序差分误差\\[0.10cm]
+    $\delta_t=r_t+\gamma V_{\phi}(s_{t+1})-V_{\phi}(s_t)$\\[0.10cm]
+    $=0+0.9\times 6.0-4.0=1.4>0$
+};
+
+\draw[flow] (s0.south) -- (td.north west);
+\draw[flow] (s1.south) -- (td.north east);
+
+% =========================
+% Bottom left: Actor update
+% =========================
+\node[actorbox] (actor) at (3.0,-1.3) {
+    Actor 更新\\[0.15cm]
+    $\delta_t>0$，说明动作 $B$ 的表现\\
+    好于原来的预期\\[0.18cm]
+    提高动作 $B$ 的选择概率\\[0.08cm]
+    $0.40 \rightarrow 0.48$
+};
+
+% =========================
+% Bottom right: Critic update
+% =========================
+\node[criticbox] (critic) at (10.0,-1.3) {
+    Critic 更新\\[0.15cm]
+    价值目标：\\[0.08cm]
+    $y_t=r_t+\gamma V_{\phi}(s_{t+1})$\\[0.08cm]
+    $=0+0.9\times 6.0=5.4$\\[0.18cm]
+    将 $V_{\phi}(s_t)$ 从 $4.0$\\
+    向 $5.4$ 调整
+};
+
+% \draw[dashedflow] (td.south west) .. controls (4.6,0.7) and (3.6,-0.1) .. (actor.north);
+% \draw[dashedflow] (td.south east) .. controls (8.5,0.7) and (9.4,-0.1) .. (critic.north);
+
+\draw[flow] (td.south west) -- (actor.north);
+\draw[flow] (td.south east) -- (critic.north);
+
+
+% =========================
+% Bottom notes
+% =========================
+% \node[note] at (3.0,-3.3) {Actor 根据评价信号调整策略};
+% \node[note] at (10.0,-3.3) {Critic 根据 TD 误差修正价值估计};
+
+\end{tikzpicture}

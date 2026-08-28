@@ -1,0 +1,53 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\stepsize{0.8cm}
+\def\boxsize{1.3}
+\def\smallsize{0.13}
+\def\yslant{0.6}
+\def\xslant{0.0}
+
+\tikzstyle{snode} = [fig/module,minimum width=3cm,minimum height=0.7cm]
+
+\begin{scope}
+
+\node [snode,anchor=south west] (sT) at (0,0) {\small{$\mathbf{s}(T)$}};
+\node [snode,anchor=south] (stm) at ([yshift=2cm]sT.north) {\small{$\mathbf{s}(t)$}};
+
+\draw [->] ([yshift=0.1cm]sT.north) -- ([yshift=0.7cm]sT.north);
+\draw [<-] ([yshift=-0.1cm]stm.south) -- ([yshift=-0.7cm]stm.south);
+\node [anchor=center] (tlabel1) at ([yshift=1.0cm]sT.north) {$\cdots$};
+
+\node [snode,anchor=south] (s0) at ([yshift=2cm]stm.north) {\small{$\mathbf{s}(0)$}};
+
+\draw [->] ([yshift=0.1cm]stm.north) -- ([yshift=0.7cm]stm.north);
+\draw [<-] ([yshift=-0.1cm]s0.south) -- ([yshift=-0.7cm]s0.south);
+\node [anchor=center] (tlabel2) at ([yshift=1.0cm]stm.north) {$\cdots$};
+
+\node [snode,anchor=east] (c) at ([xshift=-1.5cm]sT.west) {\small{$\mathbf{c}$}};
+
+\draw [->,dotted] ([xshift=2pt]c.east) -- ([xshift=-2pt]sT.west);
+\draw [->,dotted] ([xshift=-0.3cm,yshift=2pt]c.north east) .. controls +(north:1cm) and +(west:1cm) .. ([xshift=-2pt]stm.west);
+\draw [->,dotted] ([xshift=-0.6cm,yshift=2pt]c.north east) .. controls +(north:3cm) and +(west:1.1cm) .. ([xshift=-2pt]s0.west);
+
+\node [snode,anchor=south] (x) at ([yshift=2cm,xshift=2cm]s0.north) {\small{$\mathbf{x}$}};
+\draw [->] ([yshift=2pt]s0.north) .. controls +(80:3cm) and +(-100:3cm) .. ([yshift=-2pt]x.south) node [pos=0.95,right] {\footnotesize{映射为词元}};
+
+\draw [->,thick] ([xshift=2cm,yshift=-0.2cm]sT.south east) -- ([xshift=2cm,yshift=0.5cm]s0.north east);
+\node [anchor=center,circle,inner sep=0,minimum size=4pt,fill=black] (pT) at ([xshift=2cm]sT.east) {};
+\node [anchor=west] (pTlabel) at ([xshift=3pt]pT.east) {\footnotesize{$t=T$}};
+\node [anchor=center,circle,inner sep=0,minimum size=4pt,fill=black] (p0) at ([xshift=2cm]s0.east) {};
+\node [anchor=west] (p0label) at ([xshift=3pt]p0.east) {\footnotesize{$t=0$}};
+\node [anchor=west] (timeline) at ([xshift=3pt,yshift=0.7cm]p0.east) {\footnotesize{时间轴}};
+
+\node [anchor=center] (clabel) at ([yshift=-0.3cm]c.south) {\footnotesize{上下文}};
+\node [anchor=center] (sTlabel) at ([yshift=-0.3cm]sT.south) {\footnotesize{先验}};
+\node [anchor=south] (s0label) at ([yshift=2pt,xshift=0.3cm]s0.north west) {\footnotesize{去噪信号}};
+\node [anchor=south] (xlabel) at ([yshift=2pt]x.north) {\footnotesize{词元序列}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

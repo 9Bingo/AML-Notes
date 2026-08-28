@@ -1,0 +1,278 @@
+\begin{tikzpicture}[
+    font=\small,
+    flow/.style={
+        draw=black,
+        -Latex,
+        line width=0.8pt
+    },
+    panel/.style={
+        draw=black,
+        rounded corners=4pt,
+        line width=0.8pt
+    },
+    titlebox/.style={
+        draw=black,
+        rounded corners=4pt,
+        fill=blue!5,
+        minimum height=0.75cm,
+        minimum width=4.6cm,
+        align=center
+    },
+    info/.style={
+        draw=black!65,
+        rounded corners=3pt,
+        line width=0.6pt,
+        fill=gray!5
+    },
+    blackstone/.style={
+        circle,
+        draw=black,
+        fill=black,
+        minimum size=6.5mm,
+        inner sep=0pt
+    },
+    whitestone/.style={
+        circle,
+        draw=black,
+        fill=white,
+        minimum size=6.5mm,
+        inner sep=0pt
+    },
+    cand/.style={
+        circle,
+        draw=orange!80!black,
+        fill=orange!20,
+        line width=0.9pt,
+        minimum size=7mm,
+        inner sep=0pt,
+        font=\bfseries
+    },
+    bestcand/.style={
+        circle,
+        draw=green!50!black,
+        fill=green!25,
+        line width=1.1pt,
+        minimum size=7.4mm,
+        inner sep=0pt,
+        font=\bfseries
+    },
+    legendblack/.style={
+        circle,
+        draw=black,
+        fill=black,
+        minimum size=4.8mm,
+        inner sep=0pt
+    },
+    legendwhite/.style={
+        circle,
+        draw=black,
+        fill=white,
+        minimum size=4.8mm,
+        inner sep=0pt
+    },
+    legendcand/.style={
+        circle,
+        draw=orange!80!black,
+        fill=orange!20,
+        line width=0.7pt,
+        minimum size=5.0mm,
+        inner sep=0pt
+    },
+    legendbest/.style={
+        circle,
+        draw=green!50!black,
+        fill=green!25,
+        line width=0.8pt,
+        minimum size=5.2mm,
+        inner sep=0pt
+    },
+    rowbox/.style={
+        draw=black!30,
+        rounded corners=2pt,
+        line width=0.5pt
+    },
+    resultbox/.style={
+        draw=green!50!black,
+        rounded corners=2pt,
+        line width=0.65pt,
+        fill=green!10
+    }
+]
+
+% ==================================================
+% 左侧面板：当前棋盘局面
+% ==================================================
+
+\draw[panel, fill=orange!8]
+    (4.9,3.65) rectangle (11.1,11.0);
+
+\node[titlebox]
+    at (8.0,11.65)
+    {当前棋盘局面 $s_t$};
+
+\node at (8.0,10.55)
+    {\footnotesize 局部棋盘示意};
+
+% 棋盘网格
+\draw[line width=0.8pt]
+    (6,6) rectangle (10,10);
+
+\foreach \x in {6,7,8,9,10}{
+    \draw[line width=0.5pt]
+        (\x,6) -- (\x,10);
+}
+
+\foreach \y in {6,7,8,9,10}{
+    \draw[line width=0.5pt]
+        (6,\y) -- (10,\y);
+}
+
+% 横坐标
+\foreach \x in {6,7,8,9,10}{
+    \node[anchor=north]
+        at (\x,5.72)
+        {\x};
+}
+
+% 纵坐标：右对齐
+\foreach \y in {6,7,8,9,10}{
+    \node[anchor=east]
+        at (5.72,\y)
+        {\y};
+}
+
+% 已有棋子
+\node[blackstone] at (7,7) {};
+\node[blackstone] at (8,7) {};
+\node[blackstone] at (9,8) {};
+
+\node[whitestone] at (7,9) {};
+\node[whitestone] at (9,7) {};
+\node[whitestone] at (10,8) {};
+
+% 候选位置
+\node[cand] at (7,8) {A};
+\node[bestcand] at (8,8) {B};
+\node[cand] at (8,9) {C};
+\node[cand] at (9,9) {D};
+
+% 图例：第一行
+\node[legendblack] at (6.0,4.95) {};
+\node[
+    anchor=west,
+    font=\footnotesize
+] at (6.30,4.95) {黑棋};
+
+\node[legendwhite] at (8.45,4.95) {};
+\node[
+    anchor=west,
+    font=\footnotesize
+] at (8.75,4.95) {白棋};
+
+% 图例：第二行
+\node[legendcand] at (6.0,4.25) {};
+\node[
+    anchor=west,
+    font=\footnotesize
+] at (6.30,4.25) {候选位置};
+
+\node[legendbest] at (8.45,4.25) {};
+\node[
+    anchor=west,
+    font=\footnotesize
+] at (8.75,4.25) {最优候选};
+
+% ==================================================
+% 中间连接箭头
+% ==================================================
+
+\draw[flow]
+    (11.45,8.90) -- (13.15,8.90);
+
+\node at (12.30,9.23)
+    {\footnotesize 价值评估};
+
+% ==================================================
+% 右侧面板：动作价值评估
+% ==================================================
+
+\draw[panel, fill=green!5]
+    (13.5,3.65) rectangle (19.7,11.0);
+
+\node[titlebox]
+    at (16.6,11.65)
+    {动作价值评估};
+
+% 动作 A
+\draw[rowbox, fill=white]
+    (13.8,9.95) rectangle (19.3,10.60);
+
+\node[anchor=west]
+    at (13.98,10.275)
+    {$A:(7,8)$};
+
+\node[anchor=west]
+    at (16.15,10.275)
+    {$Q(s_t,A)=1.5$};
+
+% 动作 B
+\draw[rowbox, fill=green!15]
+    (13.8,9.05) rectangle (19.3,9.70);
+
+\node[anchor=west]
+    at (13.98,9.375)
+    {$B:(8,8)$};
+
+\node[anchor=west]
+    at (16.15,9.375)
+    {$Q(s_t,B)=6.2$};
+
+% 动作 C
+\draw[rowbox, fill=white]
+    (13.8,8.15) rectangle (19.3,8.80);
+
+\node[anchor=west]
+    at (13.98,8.475)
+    {$C:(8,9)$};
+
+\node[anchor=west]
+    at (16.15,8.475)
+    {$Q(s_t,C)=3.7$};
+
+% 动作 D
+\draw[rowbox, fill=white]
+    (13.8,7.25) rectangle (19.3,7.90);
+
+\node[anchor=west]
+    at (13.98,7.575)
+    {$D:(9,9)$};
+
+\node[anchor=west]
+    at (16.15,7.575)
+    {$Q(s_t,D)=-1.1$};
+
+% 动作选择公式
+\draw[info]
+    (13.8,5.75) rectangle (19.3,6.75);
+
+\node[align=center]
+    at (16.55,6.25)
+    {$
+        a_t=
+        \displaystyle
+        \arg\max_{a\in\mathcal{A}(s_t)}
+        Q(s_t,a)
+    $};
+
+% 最终选择结果
+\draw[resultbox]
+    (13.8,4.50) rectangle (19.3,5.25);
+
+\node[
+    align=center,
+    text=green!40!black,
+    font=\footnotesize\bfseries
+] at (16.55,4.875)
+    {因此选择位置 $(8,8)$ 落子};
+
+\end{tikzpicture}

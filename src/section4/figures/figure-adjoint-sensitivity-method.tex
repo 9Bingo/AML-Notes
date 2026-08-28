@@ -1,0 +1,105 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\ssep{1.3cm}
+\def\bsep{2.5cm}
+
+\tikzstyle{lnode} = [fig/module,minimum width=3.0cm,minimum height=0.6cm,inner sep=2pt]
+
+\begin{scope}
+\draw [-{Latex[scale=1.2]},thick] (0,0) -- (13.5,0);
+\draw [-{Latex[scale=1.2]},thick] (0,-1.5) -- (0,2.5);
+\node [anchor=north,align=left] (xlabel) at (13.3,-0.1) {\footnotesize{时间 $t$}};
+
+\draw [Round Cap->,blue,thick,shorten > = 4pt,shorten < = 4pt,very thick,dashed,domain=1.5:12.0,samples=100] plot (\x,{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))});
+
+\def\x{1.5}
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (point0) at (\x,\p) {};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (px0) at (\x,0) {};
+\node [anchor=north] (t0label) at (\x,-0.1) {\footnotesize{$t_0$}};
+\draw [-,dashed] (point0) -- (px0);
+
+\def\x{12.0}
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (point1) at (\x,\p) {};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (px1) at (\x,0) {};
+\node [anchor=north] (t1plabel) at (\x,-0.1) {\footnotesize{$t_1$}};
+\draw [-,dashed] (point1) -- (px1);
+
+\node [anchor=south,align=left] (odelabel) at (3.5,1.4) {\footnotesize{ODE 轨迹：}\\[-1pt] \footnotesize{$\frac{d\mathbf{x}(t)}{dt} = f(\mathbf{x}(t), \theta, t)$}};
+\draw [->] (odelabel.south) -- ([yshift=-0.3cm]odelabel.south);
+
+\node [anchor=south,align=left] (solutionlabel) at (11.5,1.5) {\footnotesize{得到终态 $\mathbf{x}(t_1)$}\\[-1pt] \footnotesize{并计算损失 $\mathcal{L}$}};
+\draw [->] (12.0,1.5) -- (12.0,1.0);
+
+\node [fig/caption,anchor=north] (caption) at (6.5,-2.0) {\small{(a) 前向传播（从 $t_0$ 到 $t_1$ 积分 ODE 动力学）}};
+
+\end{scope}
+
+\begin{scope}[yshift=-10cm]
+\draw [-{Latex[scale=1.2]},thick] (0,0) -- (13.5,0);
+\draw [-{Latex[scale=1.2]},thick] (0,-1.5) -- (0,2.5);
+\node [anchor=north,align=left] (xlabel) at (13.3,-0.1) {\footnotesize{时间 $t$}};
+
+\draw [<-Round Cap,blue,thick,shorten > = 4pt,shorten < = 4pt,very thick,domain=1.5:12.0,samples=100] plot (\x,{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))});
+
+\draw [<-Round Cap,red,shorten > = 4pt,shorten < = 4pt,very thick,domain=1.5:12.0,samples=100] plot (\x,{ - 1/300 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5) + 3});
+
+\def\x{1.5}
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\pgfmathsetmacro{\a}{-1/300 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5) + 3}
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (point0) at (\x,\p) {};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (px0) at (\x,0) {};
+\node [anchor=north] (t0label) at (\x,-0.1) {\footnotesize{$t_0$}};
+\draw [-,dashed] (point0) -- (px0);
+\node [circle,minimum size=5pt,inner sep=0,fill=red!80] (apoint0) at (\x,\a) {};
+\draw [-,dotted] (point0) -- (apoint0);
+
+\def\x{12.0}
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\pgfmathsetmacro{\a}{-1/300 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5) + 3}
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (point1) at (\x,\p) {};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (px1) at (\x,0) {};
+\node [anchor=north] (t1plabel) at (\x,-0.1) {\footnotesize{$t_1$}};
+\draw [-,dashed] (point1) -- (px1);
+\node [circle,minimum size=5pt,inner sep=0,fill=red!80] (apoint1) at (\x,\a) {};
+\draw [-,dotted] (point1) -- (apoint1);
+
+\foreach \x in {3.0,4.2,5.0,8.5,11.0}{
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\pgfmathsetmacro{\a}{-1/300 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5) + 3}
+\node [circle,minimum size=5pt,inner sep=0,fill=blue] (point) at (\x,\p) {};
+\node [circle,minimum size=5pt,inner sep=0,fill=red!80] (apoint) at (\x,\a) {};
+\draw [-,dotted] (point) -- (apoint);
+}
+
+\node [anchor=south,align=left] (odelabel) at (7,4.5) {\footnotesize{增广 ODE 轨迹：$\frac{d \mathbf{s}(t)}{dt} = [ f(\mathbf{x}(t), \theta, t), - \left( \frac{\partial f}{\partial \mathbf{x}(t)} \right)^\top \mathbf{a}(t), - \left( \frac{\partial f}{\partial \theta} \right)^\top \mathbf{a}(t) ]^\top$}};
+\draw [->] ([xshift=1.2cm]odelabel.south) -- ([xshift=1.8cm,yshift=-0.7cm]odelabel.south);
+
+\node [anchor=north,align=left] (odelabel) at (4.0,-0.6) {\footnotesize{恢复的原 ODE 轨迹}};
+\draw [->] ([xshift=-0.5cm]odelabel.north east) -- ([xshift=-0.1cm,yshift=0.3cm]odelabel.north east);
+
+\node [anchor=south,align=center] (dyn1) at (7.1,5.7) {\scriptsize{原状态}\\[-2pt] \scriptsize{动力学}};
+\node [anchor=south,align=center] (dyn2) at (9.2,5.7) {\scriptsize{伴随状态}\\[-2pt] \scriptsize{动力学}};
+\node [anchor=south,align=center] (dyn3) at (11.3,5.7) {\scriptsize{累积参数}\\[-2pt] \scriptsize{梯度动力学}};
+\draw [->] (dyn1.south) -- ([yshift=-0.3cm]dyn1.south);
+\draw [->] (dyn2.south) -- ([yshift=-0.3cm]dyn2.south);
+\draw [->] (dyn3.south) -- ([yshift=-0.3cm]dyn3.south);
+
+\node [anchor=south] (adjointstate) at (5,2.9) {\scriptsize{伴随状态 $\mathbf{a}(t)$}};
+\draw [->] ([yshift=2pt]adjointstate.south) -- ([yshift=-0.4cm]adjointstate.south);
+
+\node [anchor=south west] (oristate) at (5.35,0.55) {\scriptsize{原状态 $\mathbf{x}(t)$}};
+\draw [->]  ([xshift=0.1cm,yshift=0.1cm]oristate.south west) -- ([xshift=-0.2cm,yshift=-0.2cm]oristate.south west);
+
+\node [anchor=west] (initstate) at (12.1,3.75) {\scriptsize{初始状态}};
+
+\node [fig/caption,anchor=north] (caption) at (6.5,-2.0) {\small{(b) 反向传播（从 $t_1$ 到 $t_0$ 积分增广 ODE 动力学）}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

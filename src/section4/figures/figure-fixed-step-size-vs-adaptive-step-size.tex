@@ -1,0 +1,65 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\ssep{1.3cm}
+\def\bsep{2.5cm}
+\def\stepsize{1.0}
+
+\tikzstyle{lnode} = [fig/module,minimum width=3.0cm,minimum height=0.6cm,inner sep=2pt]
+
+\begin{scope}
+\draw [-{Latex[scale=1.2]},thick] (0,0) -- (13.5,0);
+\draw [-{Latex[scale=1.2]},thick] (0,-1.5) -- (0,2.5);
+\node [anchor=north east,align=right] (ylabel) at (0-0.1,2.5) {\footnotesize{状态 $\mathbf{x}(t)$}};
+\node [anchor=north,align=left] (xlabel) at (13.3,-0.1) {\footnotesize{时间 $t$}};
+
+\foreach \x in {1.0,2.0,...,13.0}{
+\pgfmathsetmacro{\plast}{-0.001*(((\x-\stepsize)/1.15)^4) * (\x-\stepsize) + 0.029375*(((\x-\stepsize)/1.15)^4) + 1/(1.15)^4*(- (323/1200)*((\x-\stepsize)^3) + 0.75*((\x-\stepsize)^2))}
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\draw [->,thick,shorten > = 3pt,shorten < = 3pt] (\x-\stepsize,\plast) -- (\x,\p) node [pos=1,circle,minimum size=4pt,fill=blue,inner sep=0] {};
+}
+
+\def\x{8}
+\pgfmathsetmacro{\leftp}{-0.001*(((\x-\stepsize)/1.15)^4) * (\x-\stepsize) + 0.029375*(((\x-\stepsize)/1.15)^4) + 1/(1.15)^4*(- (323/1200)*((\x-\stepsize)^3) + 0.75*((\x-\stepsize)^2))}
+\def\x{9}
+\pgfmathsetmacro{\rightp}{-0.001*(((\x-\stepsize)/1.15)^4) * (\x-\stepsize) + 0.029375*(((\x-\stepsize)/1.15)^4) + 1/(1.15)^4*(- (323/1200)*((\x-\stepsize)^3) + 0.75*((\x-\stepsize)^2))}
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (lpx) at (8,0) {};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (rpx) at (9,0) {};
+\draw [-,dashed] (8,0) -- (8,\leftp);
+\draw [-,dashed] (9,0) -- (9,\rightp);
+\draw [-] (8,0.1) -- (8,0.4);
+\draw [-] (9,0.1) -- (9,0.4);
+\draw [->] (7.6,0.25) -- (7.9,0.25);
+\draw [<-] (9.1,0.25) -- (9.4,0.25);
+\node [anchor=south] (steplabel) at (8.5,0.6) {\scriptsize{$\Delta t$ 为常数}};
+
+\node [fig/caption,anchor=north] (caption) at (6.5,-2.0) {\small{(a) 以固定时间步长演化的系统（如残差网络）}};
+
+\end{scope}
+
+\begin{scope}[yshift=-6.5cm]
+\draw [-{Latex[scale=1.2]},thick] (0,0) -- (13.5,0);
+\draw [-{Latex[scale=1.2]},thick] (0,-1.5) -- (0,2.5);
+\node [anchor=north east,align=right] (ylabel) at (0-0.1,2.5) {\footnotesize{状态 $\mathbf{x}(t)$}};
+\node [anchor=north,align=left] (xlabel) at (13.3,-0.1) {\footnotesize{时间 $t$}};
+
+\def\x{0}
+\foreach \smallstep in {1.2,0.8,0.5,0.4,0.4,0.4,1.0,1.5,0.7,0.5,0.5,0.6,0.6,0.9,1.4,0.9,0.7}{
+
+\pgfmathparse{\x + \smallstep}
+
+\xdef\x{\pgfmathresult}
+
+\pgfmathsetmacro{\plast}{-0.001*(((\x-\smallstep)/1.15)^4) * (\x-\smallstep) + 0.029375*(((\x-\smallstep)/1.15)^4) + 1/(1.15)^4*(- (323/1200)*((\x-\smallstep)^3) + 0.75*((\x-\smallstep)^2))}
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\draw [->,thick,shorten > = 3pt,shorten < = 3pt] (\x-\smallstep,\plast) -- (\x,\p) node [pos=1,circle,minimum size=4pt,fill=blue,inner sep=0] {};
+}
+
+\node [fig/caption,anchor=north] (caption) at (6.5,-2.0) {\small{(b) 连续演化或采用动态时间步长的系统（如 Neural ODE）}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

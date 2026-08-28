@@ -1,0 +1,84 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\ssep{1.3cm}
+\def\bsep{2.5cm}
+
+\tikzstyle{lnode} = [fig/module,minimum width=3.0cm,minimum height=0.6cm,inner sep=2pt]
+
+\begin{scope}
+\draw [-{Latex[scale=1.2]},thick] (0,0) -- (13.5,0);
+\draw [-{Latex[scale=1.2]},thick] (0,-1.5) -- (0,2.5);
+\node [anchor=north east,align=right] (ylabel) at (0-0.1,2.5) {\footnotesize{状态 $x(t)$}};
+\node [anchor=north,align=left] (xlabel) at (13.3,-0.1) {\footnotesize{时间 $t$}};
+
+\draw [Round Cap-Round Cap,very thick,dotted,gray!60,domain=0:12.7,samples=100] plot (\x,{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))});
+
+\foreach \x in {2.4,2.80,...,10.0}{
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\node [circle,minimum size=4pt,inner sep=0,fill=blue] (point) at (\x,\p) {};
+}
+
+\foreach \x in {2.0}{
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\node [circle,minimum size=4pt,inner sep=0,fill=blue] (point) at (\x,\p) {};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (px) at (\x,0) {};
+\node [anchor=north] (plabel) at (\x,-0.1) {\footnotesize{$t_0=0$}};
+\draw [-,dashed] (point) -- (px);
+}
+
+\foreach \x in {10.0}{
+\pgfmathsetmacro{\p}{-0.001*((\x/1.15)^4) * \x + 0.029375*((\x/1.15)^4) + 1/(1.15)^4*(- (323/1200)*(\x^3) + 0.75*(\x^2))}
+\node [circle,minimum size=4pt,inner sep=0,fill=blue] (point) at (\x,\p) {};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (px) at (\x,0) {};
+\node [anchor=south] (plabel) at (\x,0.1) {\footnotesize{$t$}};
+\draw [-,dashed] (point) -- (px);
+}
+
+\node [anchor=south,align=left] (pp) at (7,1) {\footnotesize{离散时刻的近似状态}};
+\draw [->] ([xshift=0.2cm]pp.south west) -- ([xshift=-0.05cm,yshift=-0.5cm]pp.south west);
+
+\node [fig/caption,anchor=north] (caption) at (6.5,-2.0) {\small{(a) 状态 $x(t)$ 随时间 $t$ 的变化}};
+
+\end{scope}
+
+\begin{scope}[yshift=-6.0cm]
+\draw [-{Latex[scale=1.2]},thick] (0,0) -- (13.5,0);
+\draw [-{Latex[scale=1.2]},thick] (0,-1.5) -- (0,2.5);
+\node [anchor=north east,align=right] (ylabel) at (0-0.1,2.5) {\footnotesize{动力学}\\[-2pt] \footnotesize{$f(x(t),t)$}};
+\node [anchor=north,align=left] (xlabel) at (13.3,-0.1) {\footnotesize{时间 $t$}};
+
+\draw [Round Cap-Round Cap,very thick,gray!60,domain=0:12.7,samples=100] plot (\x,{ - 1/200 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5)});
+
+\foreach \x in {2.0}{
+\pgfmathsetmacro{\p}{ - 1/200 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5)}
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (px) at (\x,0) {};
+\node [anchor=north] (plabel) at (\x,-0.1) {\footnotesize{$t_0=0$}};
+}
+
+\foreach \x in {10.0}{
+\pgfmathsetmacro{\p}{ - 1/200 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5)}
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (px) at (\x,0) {};
+\node [anchor=north] (plabel) at (\x,-0.1) {\footnotesize{$t$}};
+}
+
+\foreach \x in {2.0,2.4,...,9.8}{
+\pgfmathsetmacro{\p}{ - 1/200 * (\x -0) * (\x - 3) * (\x - 8) * (\x - 12.5)}
+\draw [thick] (\x,0) rectangle (\x+0.4,\p);
+}
+
+\node [anchor=south,align=left] (integral) at (7,1) {\footnotesize{区间 $[t_k,t_{k+1}]$ 上的积分}\\[-2pt] \footnotesize{以矩形面积近似}};
+\draw [->] ([xshift=0.3cm,yshift=0.3cm]integral.south) .. controls +(-45:1.5cm) and +(135:1.5cm) ..   (8.98,0.45);
+\node [anchor=north] (tk) at (8.8,-0.1) {\footnotesize{$t_{k}$}};
+\node [anchor=north] (tkp1) at (9.3,-0.1) {\footnotesize{$t_{k+1}$}};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (tpx) at (8.8,0) {};
+\node [circle,minimum size=3pt,inner sep=0,fill=black] (tpxp1) at (9.2,0) {};
+
+\node [fig/caption,anchor=north] (caption) at (6.5,-2.0) {\small{(b) 动力学 $f(x(t),t)$ 随时间 $t$ 的变化}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

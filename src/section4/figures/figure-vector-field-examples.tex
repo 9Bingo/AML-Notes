@@ -1,0 +1,48 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\ssep{1.3cm}
+\def\bsep{2.5cm}
+
+\tikzstyle{lnode} = [fig/module,minimum width=3.0cm,minimum height=0.6cm,inner sep=2pt]
+
+\begin{scope}[scale=0.6]
+
+\draw (-5.5,-5.5) rectangle (5.5,5.5);
+
+\foreach \x  in {-4,-3,...,4}{
+    \foreach \y  in {-4,-3,...,4}{
+        \node [circle,minimum size=1pt,inner sep=0,fill=black] (point\x\y) at (\x,\y) {};
+        \pgfmathparse{or(\x != 0, \y != 0) ? 1 : 0}
+        \ifdim\pgfmathresult pt=1pt
+            \draw [-{Stealth[scale=1.0]}] (\x,\y) -- ++({-0.2*\y}, {0.2*\x});
+        \fi
+    }
+}
+
+\node [fig/caption,anchor=center] (caption) at (0,-7) {\small{(a) 向量场 $f(\mathbf{x}) = \begin{bmatrix} -x_2 \\ x_1 \end{bmatrix}$}};
+
+\end{scope}
+
+\begin{scope}[scale=0.6,xshift=14cm]
+
+\draw (-5.5,-5.5) rectangle (5.5,5.5);
+
+\foreach \x  in {-4,-3,...,4}{
+    \foreach \y  in {-4,-3,...,4}{
+        \node [circle,minimum size=1pt,inner sep=0,fill=black] (point\x\y) at (\x,\y) {};
+        \pgfmathparse{or(\x != 0, \y != 0) ? 1 : 0}
+        \ifdim\pgfmathresult pt=1pt
+            \draw [-{Stealth[scale=1.0]}] (\x,\y) -- ++({0.2*(sin(\x) + sin(\y))}, {0.2*(sin(\x) - sin(\y))});
+        \fi
+    }
+}
+
+\node [fig/caption,anchor=center] (caption) at (0,-7) {\small{(b) 向量场 $f(\mathbf{x}) = \begin{bmatrix} \sin(x_1) + \sin(x_2) \\ \sin(x_1) - \sin(x_2) \end{bmatrix}$}};
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

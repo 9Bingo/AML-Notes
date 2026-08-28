@@ -1,0 +1,122 @@
+\documentclass[border=9pt]{standalone}
+\input{figure_preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+
+\def\sep{0.6}
+\def\stepsize{0.6cm}
+\def\ycoordp{4}
+\def\vectorsize{1cm}
+\def\smallsize{0.13}
+
+\tikzstyle{snode} = [fig/module,minimum width=4.4cm,minimum height=0.8cm]
+\tikzstyle{cnode} = [minimum width=0.3cm,minimum height=\vectorsize]
+
+\begin{scope}
+
+\node [anchor=center] (x11) at (0,0) {\small{\texttt{X}}};
+\node [anchor=center] (x12) at ([xshift=\stepsize]x11) {\small{\texttt{Y}}};
+\node [anchor=center] (x13) at ([xshift=\stepsize]x12) {\small{\texttt{A}}};
+\node [anchor=center] (x14) at ([xshift=\stepsize]x13) {\small{\texttt{B}}};
+\node [anchor=center] (x15) at ([xshift=\stepsize]x14) {\small{\texttt{C}}};
+\node [anchor=center] (x16) at ([xshift=\stepsize]x15) {\small{\texttt{D}}};
+\node [anchor=center] (x17) at ([xshift=\stepsize]x16) {\small{\texttt{E}}};
+
+\begin{pgfonlayer}{background}
+\node [fill=gray!30,inner sep=1pt] [fit = (x11) (x12) ] (ccolorbox) {};
+\node [fill=orange!30,inner sep=1pt] [fit = (x13) (x17) ] (xcolorbox) {};
+\node [anchor=center,snode] (x1box) at (x14) {};
+\end{pgfonlayer}
+
+\node [anchor=center] (x21) at ([yshift=-3.5cm]x11) {\small{\texttt{X}}};
+\node [anchor=center] (x22) at ([xshift=\stepsize]x21) {\small{\texttt{Y}}};
+\node [anchor=center] (x23) at ([xshift=\stepsize]x22) {\small{\texttt{B}}};
+\node [anchor=center] (x24) at ([xshift=\stepsize]x23) {\small{\texttt{C}}};
+\node [anchor=center] (x25) at ([xshift=\stepsize]x24) {\small{\texttt{A}}};
+\node [anchor=center] (x26) at ([xshift=\stepsize]x25) {\small{\texttt{A}}};
+\node [anchor=center] (x27) at ([xshift=\stepsize]x26) {\small{\texttt{D}}};
+
+\begin{pgfonlayer}{background}
+\node [fill=gray!30,inner sep=1pt] [fit = (x21) (x22) ] {};
+\node [fill=orange!30,inner sep=1pt] [fit = (x23) (x27) ] {};
+\node [anchor=center,snode] (x2box) at (x24) {};
+\end{pgfonlayer}
+
+\node [anchor=center] (x31) at ([yshift=-2.5cm]x21) {\small{\texttt{X}}};
+\node [anchor=center] (x32) at ([xshift=\stepsize]x31) {\small{\texttt{Y}}};
+\node [anchor=center] (x33) at ([xshift=\stepsize]x32) {\small{\texttt{B}}};
+\node [anchor=center] (x34) at ([xshift=\stepsize]x33) {\small{\texttt{C}}};
+\node [anchor=center] (x35) at ([xshift=\stepsize]x34) {\small{\texttt{A}}};
+\node [anchor=center] (x36) at ([xshift=\stepsize]x35) {\small{\texttt{A}}};
+\node [anchor=center] (x37) at ([xshift=\stepsize]x36) {\small{\texttt{B}}};
+
+\begin{pgfonlayer}{background}
+\node [fill=gray!30,inner sep=1pt] [fit = (x31) (x32) ] {};
+\node [fill=orange!30,inner sep=1pt] [fit = (x33) (x37) ] {};
+\node [anchor=center,snode] (x3box) at (x34) {};
+\end{pgfonlayer}
+
+\node [anchor=center] (x41) at ([yshift=-2.5cm]x31) {\small{\texttt{X}}};
+\node [anchor=center] (x42) at ([xshift=\stepsize]x41) {\small{\texttt{Y}}};
+\node [anchor=center] (x43) at ([xshift=\stepsize]x42) {\small{\texttt{B}}};
+\node [anchor=center] (x44) at ([xshift=\stepsize]x43) {\small{\texttt{D}}};
+\node [anchor=center] (x45) at ([xshift=\stepsize]x44) {\small{\texttt{A}}};
+\node [anchor=center] (x46) at ([xshift=\stepsize]x45) {\small{\texttt{A}}};
+\node [anchor=center] (x47) at ([xshift=\stepsize]x46) {\small{\texttt{Z}}};
+
+\begin{pgfonlayer}{background}
+\node [fill=gray!30,inner sep=1pt] [fit = (x41) (x42) ] {};
+\node [fill=orange!30,inner sep=1pt] [fit = (x43) (x47) ] {};
+\node [anchor=center,snode] (x4box) at (x44) {};
+\end{pgfonlayer}
+
+\node [anchor=center] (x51) at ([yshift=-3.5cm]x41) {\small{\texttt{X}}};
+\node [anchor=center] (x52) at ([xshift=\stepsize]x51) {\small{\texttt{Y}}};
+\node [anchor=center] (x53) at ([xshift=\stepsize]x52) {\small{\texttt{D}}};
+\node [anchor=center] (x54) at ([xshift=\stepsize]x53) {\small{\texttt{X}}};
+\node [anchor=center] (x55) at ([xshift=\stepsize]x54) {\small{\texttt{C}}};
+\node [anchor=center] (x56) at ([xshift=\stepsize]x55) {\small{\texttt{Z}}};
+\node [anchor=center] (x57) at ([xshift=\stepsize]x56) {\small{\texttt{E}}};
+
+\begin{pgfonlayer}{background}
+\node [fill=gray!30,inner sep=1pt] [fit = (x51) (x52) ] {};
+\node [fill=orange!30,inner sep=1pt] [fit = (x53) (x57) ] {};
+\node [anchor=center,snode] (x5box) at (x54) {};
+\end{pgfonlayer}
+
+\draw [->,dotted,thick,red] ([xshift=0.5cm,yshift=-2pt]x1box.south west) -- ([xshift=0.5cm,yshift=2pt]x2box.north west) node [pos=0.5,xshift=-0.3cm,rotate=90] {\scriptsize{前向过程}};
+\draw [->,thick,red] ([xshift=0.5cm,yshift=-2pt]x2box.south west) -- ([xshift=0.5cm,yshift=2pt]x3box.north west);
+\draw [->,thick,red] ([xshift=0.5cm,yshift=-2pt]x3box.south west) -- ([xshift=0.5cm,yshift=2pt]x4box.north west);
+\draw [->,dotted,thick,red] ([xshift=0.5cm,yshift=-2pt]x4box.south west) -- ([xshift=0.5cm,yshift=2pt]x5box.north west);
+
+\draw [<-,dotted,thick,blue] ([xshift=-0.5cm,yshift=-2pt]x1box.south east) -- ([xshift=-0.5cm,yshift=2pt]x2box.north east) node [pos=0.5,xshift=0.3cm,rotate=90] {\scriptsize{反向过程}};
+\draw [<-,thick,blue] ([xshift=-0.5cm,yshift=-2pt]x2box.south east) -- ([xshift=-0.5cm,yshift=2pt]x3box.north east);
+\draw [<-,thick,blue] ([xshift=-0.5cm,yshift=-2pt]x3box.south east) -- ([xshift=-0.5cm,yshift=2pt]x4box.north east);
+\draw [<-,dotted,thick,blue] ([xshift=-0.5cm,yshift=-2pt]x4box.south east) -- ([xshift=-0.5cm,yshift=2pt]x5box.north east);
+
+\node [anchor=north] (x1label) at (x1box.south) {\small{$(\mathbf{x}(0), \mathbf{c})$}};
+\node [anchor=north] (x2label) at (x2box.south) {\small{$(\mathbf{x}(t - 1), \mathbf{c})$}};
+\node [anchor=north] (x3label) at (x3box.south) {\small{$(\mathbf{x}(t), \mathbf{c})$}};
+\node [anchor=north] (x4label) at (x4box.south) {\small{$(\mathbf{x}(t + 1), \mathbf{c})$}};
+\node [anchor=north] (x5label) at (x5box.south) {\small{$(\mathbf{x}(T), \mathbf{c})$}};
+
+\node [anchor=east] (clabel) at ([xshift=-1.5cm,yshift=0.8cm]x1box.north) {\footnotesize{上下文 $\mathbf{c}$（固定）}};
+
+\node [anchor=west] (xlabel) at ([xshift=1cm,yshift=0.8cm]x1box.north) {\footnotesize{目标序列 $\mathbf{x}(0)$}};
+
+\draw [->,thin] ([xshift=-0.0cm]clabel.south) .. controls +(south:0.6cm) and +(north:0.6cm) .. ([yshift=0pt]ccolorbox.north);
+
+\draw [->,thin] ([xshift=-0.3cm]xlabel.south) .. controls +(south:0.6cm) and +(north:0.6cm) .. ([xshift=0.3cm]xcolorbox.north);
+
+\node [anchor=north east,align=left] (forwardlabel) at ([xshift=-0.3cm,yshift=-0.1cm]x2box.south west) {\footnotesize{计算前向转移概率}\\[-2pt] \footnotesize{$q(\mathbf{x}(t) | \mathbf{x}(t - 1), \mathbf{c})$}\\[-2pt] \footnotesize{与反向后验}\\[-2pt] \footnotesize{$q(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{x}(0),\mathbf{c})$}\\[-2pt] \footnotesize{（均有闭式解）}};
+
+\node [anchor=north west,align=left] (backwardlabel) at ([xshift=0.1cm,yshift=-0.1cm]x2box.south east) {\footnotesize{使用网络}\\[-2pt] \footnotesize{$p_\theta(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{c})$}\\[-2pt] \footnotesize{预测 $\mathbf{x}(t-1)$}};
+
+\node [fig/module,anchor=north west,align=left] (trainlabel) at ([yshift=-1cm]backwardlabel.south) {\footnotesize{训练 $\theta$ 时，最小化}\\[-2pt] \footnotesize{$q(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{x}(0),\mathbf{c})$}\\[-2pt] \footnotesize{与}\\[-2pt] \footnotesize{$p_\theta(\mathbf{x}(t-1)| \mathbf{x}(t),\mathbf{c})$}\\[-2pt] \footnotesize{之间的 KL 散度}};
+
+\draw [->] ([xshift=-0.5cm]trainlabel.north east) .. controls +(north:1cm) and +(east:0.8cm) ..  (backwardlabel.east);
+
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

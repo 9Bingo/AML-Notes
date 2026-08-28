@@ -1,0 +1,210 @@
+% !TeX program = xelatex
+% 高级机器学习中文讲义
+% 编译建议：XeLaTeX 或 LuaLaTeX。Windows / macOS / Linux 均可使用 ctex 自动处理中文字体。
+% \documentclass[UTF8,fontset=none,a4paper,zihao=-4,oneside,openany]{ctexbook}
+\documentclass[UTF8,a4paper,zihao=-4,oneside,openany]{ctexbook}
+
+
+
+% 页面与基础排版
+\usepackage[
+  top=2.6cm,
+  bottom=2.6cm,
+  left=2.7cm,
+  right=2.7cm,
+  headheight=15pt
+]{geometry}
+\usepackage{setspace}
+\setstretch{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.2em}
+
+% 数学、表格、图片
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{
+  arrows.meta,
+  automata,
+  backgrounds,
+  calc,
+  chains,
+  decorations.pathmorphing,
+  decorations.pathreplacing,
+  fit,
+  matrix,
+  patterns,
+  positioning,
+  shadows,
+  shapes,
+  shapes.arrows,
+  shapes.geometric
+}
+
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\graphicspath{{figures/}{images/}}
+
+% 与“参考样例”保持一致：数字编号引用，并对同一处的多篇文献排序、压缩
+\usepackage[numbers,sort&compress]{natbib}
+\bibliographystyle{plainnat}
+
+% 颜色与强调框
+\usepackage[most]{tcolorbox}
+\usepackage{xcolor}
+\definecolor{CourseInk}{HTML}{1F2933}
+\definecolor{CourseBlue}{HTML}{24577A}
+\definecolor{CourseGreen}{HTML}{2D6A4F}
+\definecolor{CourseGold}{HTML}{A16207}
+\definecolor{CourseGray}{HTML}{F4F6F8}
+\definecolor{CourseLine}{HTML}{D9E2EC}
+\definecolor{ugreen}{HTML}{2E8B57}
+\definecolor{kellygreen}{HTML}{4CBB17}
+\definecolor{lightcyan}{HTML}{D9F5F7}
+\definecolor{lightgreen}{HTML}{DFF3D8}
+\definecolor{lightpink}{HTML}{F7D9E8}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\tcbset{
+  enhanced,
+  boxrule=0.6pt,
+  arc=2mm,
+  left=3mm,
+  right=3mm,
+  top=2mm,
+  bottom=2mm,
+  breakable
+}
+
+\newtcolorbox{learninggoals}{
+  colback=CourseGray,
+  colframe=CourseBlue,
+  title=学习目标,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{importantnote}{
+  colback=white,
+  colframe=CourseGreen,
+  title=重点提示,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{examplebox}[1][]{
+  colback=white,
+  colframe=CourseGold,
+  title=例题 #1,
+  fonttitle=\bfseries
+}
+
+\newtcolorbox{exercisebox}{
+  colback=CourseGray,
+  colframe=CourseLine,
+  title=课后练习,
+  fonttitle=\bfseries\color{CourseInk}
+}
+
+% 页眉页脚与链接
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small 高级机器学习讲义}
+\fancyhead[R]{\small \leftmark}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\usepackage[
+  colorlinks=true,
+  linkcolor=CourseBlue,
+  urlcolor=CourseGreen,
+  citecolor=CourseGold
+]{hyperref}
+
+% 章节样式
+\ctexset{
+  chapter = {
+    name = {第,讲},
+    number = \chinese{chapter},
+    format = \huge\bfseries\color{CourseBlue},
+    beforeskip = 0pt,
+    afterskip = 22pt
+  },
+  section = {
+    format = \Large\bfseries\color{CourseInk}
+  },
+  subsection = {
+    format = \large\bfseries\color{CourseInk}
+  }
+}
+
+% 常用命令
+\newcommand{\coursename}{高级机器学习}
+\newcommand{\semester}{2026}
+\newcommand{\teacher}{授课教师}
+\newcommand{\school}{学校 / 机构名称}
+\newcommand{\lessondate}{\today}
+
+\newcommand{\blankline}{\par\noindent\rule{\linewidth}{0.4pt}\par}
+\newcommand{\keyword}[1]{\textbf{\color{CourseBlue}#1}}
+
+\begin{document}
+
+% 封面
+\begin{titlepage}
+  \centering
+  \vspace*{1.5cm}
+  {\zihao{1}\bfseries\color{CourseBlue}\coursename\par}
+  \vspace{0.8cm}
+  {\zihao{3}\bfseries 第一部分：机器学习数学基础\par}
+  \vspace{1.2cm}
+
+  \IfFileExists{figures/cover.jpg}{
+    \includegraphics[width=0.78\linewidth,height=0.32\textheight,keepaspectratio]{figures/cover.jpg}
+  }{
+    \fbox{
+      \begin{minipage}[c][0.24\textheight][c]{0.78\linewidth}
+        \centering
+        将封面图命名为 \texttt{cover.jpg} 并放入 \texttt{figures/} 目录后，会自动显示在这里。
+      \end{minipage}
+    }
+  }
+
+  \vfill
+  \begin{tabular}{rl}
+    \textbf{教师：} & \teacher \\
+    \textbf{学期：} & \semester \\
+    \textbf{单位：} & \school \\
+    \textbf{日期：} & \lessondate \\
+  \end{tabular}
+  \vspace*{1.2cm}
+\end{titlepage}
+
+% 目录
+\frontmatter
+\pagestyle{plain}
+\tableofcontents
+\cleardoublepage
+
+% 正文
+\mainmatter
+\pagestyle{fancy}
+
+\input{chapters/part1_ml_foundations}
+
+
+\backmatter
+\renewcommand{\bibname}{参考文献}
+\addcontentsline{toc}{chapter}{参考文献}
+\bibliography{references}
+
+\end{document}

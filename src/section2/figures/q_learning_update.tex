@@ -1,0 +1,239 @@
+\begin{tikzpicture}[
+    font=\small,
+    topbox/.style={
+        draw=black!75,
+        rounded corners=4pt,
+        minimum height=2.55cm,
+        align=center,
+        line width=0.75pt,
+        inner xsep=6pt,
+        inner ysep=5pt,
+        font=\footnotesize
+    },
+    estimatebox/.style={
+        topbox,
+        fill=blue!6,
+        text width=3.25cm
+    },
+    samplebox/.style={
+        topbox,
+        fill=orange!10,
+        text width=3.85cm
+    },
+    targetbox/.style={
+        topbox,
+        fill=green!8,
+        text width=3.65cm
+    },
+    updatebox/.style={
+        topbox,
+        fill=green!15,
+        text width=3.15cm
+    },
+    formulabox/.style={
+        draw=black!75,
+        rounded corners=4pt,
+        fill=gray!5,
+        minimum width=16.4cm,
+        minimum height=1.90cm,
+        align=center,
+        line width=0.8pt,
+        inner xsep=8pt,
+        inner ysep=7pt
+    },
+    calculationbox/.style={
+        draw=green!45!black,
+        rounded corners=4pt,
+        fill=green!7,
+        minimum width=12.5cm,
+        minimum height=1.30cm,
+        align=center,
+        line width=0.8pt,
+        inner xsep=8pt,
+        inner ysep=6pt
+    },
+    flow/.style={
+        draw=black!80,
+        -Latex,
+        line width=0.75pt,
+        shorten <=2pt,
+        shorten >=2pt
+    },
+    inputflow/.style={
+        draw=black!65,
+        dashed,
+        -Latex,
+        line width=0.7pt,
+        shorten <=2pt,
+        shorten >=2pt
+    },
+    flowlabel/.style={
+        font=\scriptsize,
+        text=black!80,
+        fill=white,
+        inner xsep=1.5pt,
+        inner ysep=0.5pt
+    },
+    inputlabel/.style={
+        font=\scriptsize,
+        text=black!70,
+        fill=white,
+        inner xsep=1.5pt,
+        inner ysep=0.5pt
+    },
+    explanation/.style={
+        font=\footnotesize,
+        text=black!75,
+        align=center
+    }
+]
+
+% 保留足够的上下左右边距，避免导出时内容被裁切
+\path[use as bounding box]
+    (-2.2,-8.15) rectangle (18.0,1.75);
+
+% ==================================================
+% 第一层：Q-learning 的四个步骤
+% ==================================================
+
+\node[estimatebox] (estimate) at (0,0) {
+    {\small\bfseries 当前价值估计}\\[5pt]
+    \mbox{智能体在位置 $(8,8)$ 落子}\\[6pt]
+    $\displaystyle Q(s_t,(8,8))=2.0$
+};
+
+\node[samplebox] (sample) at (5.2,0) {
+    {\small\bfseries 观察交互结果}\\[5pt]
+    即时奖励：$r_t=0$\\[5pt]
+    \mbox{下一状态最大动作价值}\\[3pt]
+    $\displaystyle
+    \max_{a'}Q(s_{t+1},a')=6.0
+    $
+};
+
+\node[targetbox] (target) at (10.8,0) {
+    {\small\bfseries 计算价值目标}\\[5pt]
+    $\displaystyle
+    y_t=
+    r_t+\gamma\max_{a'}Q(s_{t+1},a')
+    $\\[6pt]
+    $\displaystyle
+    y_t=0+0.9\times6.0=5.4
+    $
+};
+
+\node[updatebox] (update) at (15.8,0) {
+    {\small\bfseries 更新动作价值}\\[5pt]
+    学习率：$\alpha=0.5$\\[7pt]
+    $\displaystyle Q_{\mathrm{new}}=3.7$
+};
+
+% ==================================================
+% 顶部流程箭头
+% ==================================================
+
+\draw[flow]
+    (estimate.east)
+    --
+    node[midway, above=4pt, flowlabel]
+    {执行动作}
+    (sample.west);
+
+\draw[flow]
+    (sample.east)
+    --
+    node[midway, above=4pt, flowlabel]
+    {计算目标}
+    (target.west);
+
+\draw[flow]
+    (target.east)
+    --
+    node[midway, above=4pt, flowlabel]
+    {更新估计}
+    (update.west);
+
+% ==================================================
+% 第二层：Q-learning 更新公式
+% ==================================================
+
+\node[formulabox] (formula) at (7.9,-3.75) {
+    {\small\bfseries Q-learning 更新公式}\\[7pt]
+    $\displaystyle
+    \begin{aligned}
+    y_t
+    &=
+    r_t+
+    \gamma\max_{a'}Q(s_{t+1},a'),
+    \\[3pt]
+    Q(s_t,a_t)
+    &\leftarrow
+    Q(s_t,a_t)
+    +
+    \alpha
+    \bigl[
+        y_t-Q(s_t,a_t)
+    \bigr].
+    \end{aligned}
+    $
+};
+
+% 在公式框上边缘设置两个输入位置
+\coordinate (formula-current-input)
+    at ([xshift=-6.7cm]formula.north);
+
+\coordinate (formula-target-input)
+    at ([xshift=1.7cm]formula.north);
+
+% 当前估计值输入
+\draw[inputflow]
+    (estimate.south)
+    to[out=-90,in=90]
+    node[pos=0.50, left=3pt, inputlabel]
+    {当前估计值}
+    (formula-current-input);
+
+% 目标值输入
+\draw[inputflow]
+    (target.south)
+    to[out=-90,in=90]
+    node[pos=0.50, right=3pt, inputlabel]
+    {目标值}
+    (formula-target-input);
+
+% ==================================================
+% 第三层：代入数值并得到更新结果
+% ==================================================
+
+\node[calculationbox] (calculation) at (7.9,-6.35) {
+    $\displaystyle
+    Q(s_t,(8,8))
+    \leftarrow
+    2.0
+    +
+    0.5\times(5.4-2.0)
+    =
+    \textcolor{green!40!black}{\mathbf{3.7}}
+    $
+};
+
+\draw[flow]
+    (formula.south)
+    --
+    node[midway, right=5pt, flowlabel]
+    {代入数值}
+    (calculation.north);
+
+% ==================================================
+% 底部结果说明
+% ==================================================
+
+\node[
+    explanation,
+    text width=12.5cm
+] at (7.9,-7.65) {
+    新观测得到的目标价值高于原有估计，\\[3pt]
+    因此位置 $(8,8)$ 的动作价值由 $2.0$ 提高至 $3.7$。
+};
+
+\end{tikzpicture}

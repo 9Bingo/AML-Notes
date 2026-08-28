@@ -1,0 +1,56 @@
+\label{sec:training-reward-models}
+
+\noindent 奖励模型在通用强化学习框架中扮演着核心角色，是计算价值函数的基础。本节将讨论如何训练这样的奖励模型。
+
+在 RLHF 中，奖励模型是一个将输入和输出 token 序列对映射为标量的神经网络。给定输入 $\mathbf{x}$ 和输出 $\mathbf{y}$，奖励值可以表示为
+\begin{eqnarray}
+r & = & \mathrm{Reward}(\mathbf{x},\mathbf{y})
+\end{eqnarray}
+其中 $\mathrm{Reward}(\cdot)$ 即奖励模型。$r$ 衡量的是在给定输入 $\mathbf{x}$ 的条件下，输出 $\mathbf{y}$ 与期望行为的一致程度。如前所述，我们假设 $\mathbf{x}$ 和 $\mathbf{y}$ 都是完整的文本，这意味着奖励模型需要基于整个序列的语义来给出评判。在具体实现中，我们会将 $\mathbf{x}$ 和 $\mathbf{y}$ 拼接后送入模型，模型在序列的每个位置都会产生一个输出，但我们只取序列末尾（即 $\mathbf{y}$ 的最后一个 token 之后）的表示来计算最终奖励；中间位置的输出可以约定为 0 或其他占位值。为保持符号简洁，下文直接用 $r(\mathbf{x},\mathbf{y})$ 表示奖励模型 $\mathrm{Reward}(\mathbf{x},\mathbf{y})$。
+
+实现奖励模型的方式有很多。一种简单的做法是基于预训练的大语言模型来构建。具体地，我们将 $\mathbf{x}$ 和 $\mathbf{y}$ 拼接成一个单一的 token 序列 $\mathrm{seq}_{\mathbf{x},\mathbf{y}} = [\mathbf{x}, \mathbf{y}]$，将其输入一个预训练的 LLM，并从最顶层 Transformer 层的每个位置获取表示。我们取出最后一个位置的表示 $\mathbf{h}_{\mathrm{last}}$，并通过一个线性变换将其映射为标量：
+\begin{eqnarray}
+r(\mathbf{x},\mathbf{y}) & = & \mathbf{h}_{\mathrm{last}} \mathbf{W}_{r}
+\end{eqnarray}
+其中 $\mathbf{h}_{\mathrm{last}}$ 是 $d$ 维向量，$\mathbf{W}_{r}$ 是 $d \times 1$ 的线性映射矩阵。该架构如图 \ref{fig:reward-model-architecture} 所示。
+
+\begin{figure}[!t]
+\centering
+\input{figures/Chapter4/figure-reward-model-architecture}
+\caption{基于 Transformer 的奖励模型架构。模型主体仍是一个 LLM，其 Transformer 解码器作为序列表示模型。我们抽取解码器在最后一个位置的表示作为整个序列 $[\mathbf{x},\mathbf{y}]$ 的表示，再通过一个线性映射将其转换为标量奖励分数。}
+\label{fig:reward-model-architecture}
+\end{figure}
+
+训练奖励模型的第一步是收集关于若干生成输出的人类反馈。给定输入 $\mathbf{x}$，我们先用 LLM 生成多个候选输出 $\{\mathbf{y}_1,\dots,\mathbf{y}_N\}$。人类反馈通常可以通过以下几种方式获得：
+\begin{itemize}
+\item \textbf{成对比较}（\textbf{成对排序}）：给定两个不同的输出，人类专家指出哪一个更好。
+\item \textbf{评分}：人类专家为每个输出单独给出一个数值分数（例如 1--5 分）。
+\item \textbf{列表排序}：人类专家直接对一组输出进行整体排序。
+\end{itemize}
+
+这里我们聚焦于成对比较反馈，因为它是 RLHF 中最简单且最常用的人类反馈形式之一。在该设置下，每次从候选池 $\{\mathbf{y}_1,\dots,\mathbf{y}_N\}$ 中随机抽取两个输出 $(\mathbf{y}_a,\mathbf{y}_b)$，呈现给人类专家，并要求其根据清晰度、相关性、准确性等标准表明偏好。偏好结果可以编码为二元标签：$\mathbf{y}_a \succ \mathbf{y}_b$ 表示 $\mathbf{y}_a$ 更受偏好，$\mathbf{y}_b \succ \mathbf{y}_a$ 则相反。
+
+为了从成对比较数据中学习奖励模型，我们需要一个将偏好结果与奖励分数联系起来的概率模型。\mindex{Bradley-Terry model} \cite{bradley-and-terry:rank} 正是这样一种简单且广泛使用的模型，它估计一个项目比另一个项目更受偏好的概率。适配到当前符号，$\mathbf{y}_a$ 比 $\mathbf{y}_b$ 更受偏好的概率可写为
+\begin{eqnarray}
+\Pr(\mathbf{y}_a \succ \mathbf{y}_b \mid \mathbf{x}) & = & \frac{e^{r(\mathbf{x},\mathbf{y}_a)}}{e^{r(\mathbf{x},\mathbf{y}_a)} + e^{r(\mathbf{x},\mathbf{y}_b)}} \nonumber \\
+                                                  & = & \frac{e^{r(\mathbf{x},\mathbf{y}_a)-r(\mathbf{x},\mathbf{y}_b)}}{e^{r(\mathbf{x},\mathbf{y}_a)-r(\mathbf{x},\mathbf{y}_b)}+1} \nonumber \\
+                                                  & = & \mathrm{Sigmoid}\bigl(r(\mathbf{x},\mathbf{y}_a)-r(\mathbf{x},\mathbf{y}_b)\bigr)
+\end{eqnarray}
+
+训练奖励模型时，我们希望奖励模型赋予被偏好输出更高的分数，也就是最大化上述偏好概率。由此可以得到基于 Bradley-Terry 模型的损失函数
+\begin{eqnarray}
+\mathcal{L}_r(\phi) & = & -\mathbb{E}_{(\mathbf{x},\mathbf{y}_a,\mathbf{y}_b) \sim \mathcal{D}_r} \bigl[ \log \mathrm{Pr}_{\phi}(\mathbf{y}_a \succ \mathbf{y}_b \mid \mathbf{x}) \bigr] \label{eq:pairwise-reward-loss-expectation}
+\end{eqnarray}
+其中 $(\mathbf{x},\mathbf{y}_a,\mathbf{y}_b)$ 采样自包含输入及其偏好输出对的人类标注数据集 $\mathcal{D}_r$，$\phi$ 表示奖励模型的参数（包括 Transformer 解码器的参数和线性映射矩阵 $\mathbf{W}_{r}$）。实际中通常假设样本均匀采样，因此可以用求和代替期望：
+\begin{eqnarray}
+\mathcal{L}_r(\phi) & = & -\frac{1}{|\mathcal{D}_r|} \sum_{(\mathbf{x},\mathbf{y}_a,\mathbf{y}_b) \in \mathcal{D}_r} \log \mathrm{Pr}_{\phi}(\mathbf{y}_a \succ \mathbf{y}_b \mid \mathbf{x}) \label{eq:pairwise-reward-loss-sum}
+\end{eqnarray}
+
+训练的目标是找到最小化该损失的最优参数 $\hat{\phi}$：
+\begin{eqnarray}
+\hat{\phi} & = & \argmin_{\phi} \mathcal{L}_r(\phi)
+\end{eqnarray}
+
+由于奖励模型本身也是一个 LLM，我们可以直接复用标准的 Transformer 训练流程，只需将交叉熵损失替换为公式 (\ref{eq:pairwise-reward-loss-sum}) 中的成对比较损失。训练完成后，我们便可用训练好的奖励模型 $r_{\hat{\phi}}(\cdot)$ 来为目标 LLM 的对齐提供监督信号。
+
+值得注意的是，尽管我们使用成对比较数据来训练奖励模型，但在后续的对齐阶段，奖励模型是独立地为每个输入-输出对打分的。成对排序的训练目标使奖励模型对输出之间的细微质量差异足够敏感，而我们依赖其输出的连续标量分数来指导策略优化。这样做的一个优势在于：无论训练时选用何种具体的排序损失，只要最终能获得一个可靠的标量奖励函数，它就可以无缝嵌入到统一的 RLHF 对齐框架中。
