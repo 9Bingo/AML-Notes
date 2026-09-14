@@ -6,7 +6,7 @@
 <h2>课程介绍</h2>
 <p>本课程围绕高级机器学习中的核心理论与前沿方法展开，涵盖机器学习数学基础与表示学习、强化学习、大模型预训练与微调、深度学习中的连续动力学，以及多模态机器学习等主题。</p>
 <p>课程以教材阅读与课堂讲授为主，帮助学习者建立从数学基础、模型训练到前沿生成模型的系统知识框架。课件、作业和答疑信息将随课程进展逐步补充。</p>
-<h2>参考教材</h2><p>本课程当前使用以下教材：</p><ol><li><a href="src/main.pdf">《高级机器学习教材》合订版（PDF）</a></li></ol>
+<h2>参考教材</h2><p>本课程当前使用以下教材：</p><ol><li><a href="src/aml-notes.pdf">《高级机器学习教材》合订版（PDF）</a></li></ol>
 <h2>成绩评定</h2><p>课程成绩构成、作业要求与提交方式：<strong>待补充</strong>。</p>
 <section class="outline"><h2>内容大纲</h2>
 <article><h3>第一章　机器学习数学基础与表示学习</h3><ul><li><strong>1.1 机器学习的数学基础</strong><ul><li>1.1.1 张量代数与线性对象</li><li>1.1.2 高级矩阵微积分与计算图</li><li>1.1.3 凸优化理论与训练目标</li><li>1.1.4 高维数据的表示与计算</li></ul></li><li><strong>1.2 机器学习机制与优化范式</strong><ul><li>1.2.1 监督学习、无监督学习与自监督学习</li><li>1.2.2 机器学习建模机制</li><li>1.2.3 优化算法与训练过程</li><li>1.2.4 模型评估与模型选择</li><li>1.2.5 正则化机制</li></ul></li><li><strong>1.3 深度神经网络基础</strong><ul><li>1.3.1 多层感知机机制</li><li>1.3.2 自注意力机制</li><li>1.3.3 Encoder/Decoder 结构</li></ul></li><li><strong>1.4 表示学习机制</strong><ul><li>1.4.1 分布式表示</li><li>1.4.2 特征映射与表示空间</li><li>1.4.3 预训练与表示迁移</li></ul></li><li>1.5 本章小结</li></ul></article>
@@ -17,18 +17,18 @@
 </section>
 <h2>课程安排</h2>
 <table><thead><tr><th>章节</th><th>内容</th><th>教材</th><th>课件</th><th>补充资料</th></tr></thead><tbody>
-<tr><td>第 1 章</td><td><a href="src/main.pdf#page=6">机器学习数学基础与表示学习</a></td><td><a href="src/main.pdf#page=6">阅读章节</a></td><td>待补充</td><td>待补充</td></tr>
-<tr><td>第 2 章</td><td><a href="src/main.pdf#page=58">强化学习基础</a></td><td><a href="src/main.pdf#page=58">阅读章节</a></td><td>待补充</td><td>待补充</td></tr>
-<tr><td>第 3 章</td><td><a href="src/main.pdf#page=92">大模型预训练与微调方法</a></td><td><a href="src/main.pdf#page=92">阅读章节</a></td><td>待补充</td><td>待补充</td></tr>
-<tr><td>第 4 章</td><td><a href="src/main.pdf#page=144">深度学习中的连续动力学机制</a></td><td><a href="src/main.pdf#page=144">阅读章节</a></td><td>待补充</td><td>待补充</td></tr>
-<tr><td>第 5 章</td><td><a href="src/main.pdf#page=221">多模态机器学习方法与模型</a></td><td><a href="src/main.pdf#page=221">阅读章节</a></td><td>待补充</td><td>待补充</td></tr>
+<tr><td>第 1 章</td><td><a href="src/aml-notes.pdf#page=6">机器学习数学基础与表示学习</a></td><td><a href="src/aml-notes.pdf#page=6">阅读章节</a></td><td>待补充</td><td>待补充</td></tr>
+<tr><td>第 2 章</td><td><a href="src/aml-notes.pdf#page=58">强化学习基础</a></td><td><a href="src/aml-notes.pdf#page=58">阅读章节</a></td><td>待补充</td><td>待补充</td></tr>
+<tr><td>第 3 章</td><td><a href="src/aml-notes.pdf#page=92">大模型预训练与微调方法</a></td><td><a href="src/aml-notes.pdf#page=92">阅读章节</a></td><td>待补充</td><td>待补充</td></tr>
+<tr><td>第 4 章</td><td><a href="src/aml-notes.pdf#page=144">深度学习中的连续动力学机制</a></td><td><a href="src/aml-notes.pdf#page=144">阅读章节</a></td><td>待补充</td><td>待补充</td></tr>
+<tr><td>第 5 章</td><td><a href="src/aml-notes.pdf#page=221">多模态机器学习方法与模型</a></td><td><a href="src/aml-notes.pdf#page=221">阅读章节</a></td><td>待补充</td><td>待补充</td></tr>
 </tbody></table>
 <h2>答疑</h2><p>答疑时间、地点与联系方式：<strong>待补充</strong>。</p>
 <script>
   const chapterPages = [6, 58, 92, 144, 221];
   document.querySelectorAll('.outline h3').forEach((heading, index) => {
     const link = document.createElement('a');
-    link.href = `src/main.pdf#page=${chapterPages[index]}`;
+    link.href = `src/aml-notes.pdf#page=${chapterPages[index]}`;
     link.textContent = heading.textContent;
     heading.replaceChildren(link);
   });
