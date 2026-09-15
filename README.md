@@ -1,21 +1,21 @@
-# **高级机器学习教材**
+# **高级机器学习**
 # **Advanced Machine Learning**
 
-
-*作者：*
-*单位：*
-*网站：*
+*作者团队：东北大学自然语言处理实验室师生*  
+*单位：东北大学自然语言处理实验室 (NEUNLPLab) / 小牛翻译 (NiuTrans Research)*  
 *GitHub：*[https://github.com/9Bingo/AML-Notes](https://github.com/9Bingo/AML-Notes)
 
-本教材介绍······
+这是一本面向生成式人工智能时代的高级机器学习教材，主要对现代机器学习中的重要基础理论与前沿方法进行较为系统的介绍，并在此基础上进一步讨论大模型、强化学习、连续动力学与多模态学习等相关技术。教材内容可供计算机、人工智能、自然语言处理等相关专业的高年级本科生及研究生学习使用，也可作为相关研究人员了解现代机器学习方法体系的参考资料。
+
+本书主要包括机器学习数学基础与表示学习、强化学习、大模型预训练与微调、连续动力学机制以及多模态机器学习等内容。各章节既关注基本概念与核心方法，也结合近年来生成式人工智能的发展介绍相关前沿技术，希望帮助读者从基础原理出发，逐步建立对现代机器学习方法体系的整体认识。
 
 ## 完整PDF版
 
-本教材的完整 PDF 版本：[main.pdf](src/main.pdf)
+本教材的完整 PDF 版本：[aml-notes.pdf](src/aml-notes.pdf)
 
-## 章节内容（Web版）
+## 教材目录
 
-<a href="src/main.pdf#page=6" title="第一章 机器学习数学基础与表示学习">1. 机器学习数学基础与表示学习</a>
+<a href="src/aml-notes.pdf#page=6" title="第一章 机器学习数学基础与表示学习">1. 机器学习数学基础与表示学习</a>
 
 
 - 1.1 机器学习的数学基础
@@ -43,7 +43,7 @@
   - 1.4.3 预训练与表示迁移
 - 1.5 本章小结
 
-<a href="src/main.pdf#page=58" title="第二章 强化学习基础">2. 强化学习基础</a>
+<a href="src/aml-notes.pdf#page=58" title="第二章 强化学习基础">2. 强化学习基础</a>
 
 
 - 2.1 强化学习建模方法
@@ -73,7 +73,7 @@
   - 2.5.3 强化学习方法的奖励构建问题
 - 2.6 本章小结
 
-<a href="src/main.pdf#page=92" title="第三章 大模型预训练与微调方法">3. 大模型预训练与微调方法</a>
+<a href="src/aml-notes.pdf#page=92" title="第三章 大模型预训练与微调方法">3. 大模型预训练与微调方法</a>
 
 
 - 3.1 大模型预训练技术
@@ -107,7 +107,7 @@
   - 3.5.4 从推理大模型到智能体
 - 3.6 本章小结
 
-<a href="src/main.pdf#page=144" title="第四章 深度学习中的连续动力学机制">4. 深度学习中的连续动力学机制</a>
+<a href="src/aml-notes.pdf#page=144" title="第四章 深度学习中的连续动力学机制">4. 深度学习中的连续动力学机制</a>
 
 
 - 4.1 连续动力学的数学基础
@@ -145,7 +145,7 @@
   - 4.5.4 离散扩散的评注
   - 4.5.5 本章小结
 
-<a href="src/main.pdf#page=221" title="第五章 多模态机器学习方法与模型">5. 多模态机器学习方法与模型</a>
+<a href="src/aml-notes.pdf#page=221" title="第五章 多模态机器学习方法与模型">5. 多模态机器学习方法与模型</a>
 
 
 - 5.1 多模态表示学习与跨模态对齐
@@ -172,16 +172,16 @@
 
 ## 源代码
 
-本教材的 LaTeX 源代码位于 [src](src/) 目录。主文件为 [src/main.tex](src/main.tex)，完整 PDF 为 [src/main.pdf](src/main.pdf)。
+本教材的 LaTeX 源代码位于 [src](src/) 目录。主文件为 [src/aml-notes.tex](src/aml-notes.tex)，完整 PDF 为 [src/aml-notes.pdf](src/aml-notes.pdf)。
 
 建议使用 XeLaTeX 编译：
 
 ```shell
 cd src
-xelatex main.tex
-bibtex main
-xelatex main.tex
-xelatex main.tex
+xelatex aml-notes.tex
+bibtex aml-notes
+xelatex aml-notes.tex
+xelatex aml-notes.tex
 ```
 
 ## 课件
@@ -190,5 +190,9 @@ xelatex main.tex
 
 ## 致谢
 
-## 联系我们
+感谢所有参与本书编写、整理与配套教学资源建设的小牛团队（部分）成员
 
+杨曦涵、陈丹、吴钰璋、李天园、张俊翔、叶凯阳、王俊鑫、朱梓铭、徐欣怡、赵润松、葛政锟、李恒雨、赵洵、刘宏宇、林丁洋、牛苗赫、兰亭序、刘晓倩、丁妍、王成龙、肖桐。
+
+## 联系我们
+有任何问题请联系xiaotong [at] mail.neu.edu.cn （肖桐） 或 wangchenglong [at] mail.neu.edu.cn（王成龙）
