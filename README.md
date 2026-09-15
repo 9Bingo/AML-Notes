@@ -194,5 +194,13 @@ xelatex aml-notes.tex
 
 杨曦涵、陈丹、吴钰璋、李天园、张俊翔、叶凯阳、王俊鑫、朱梓铭、徐欣怡、赵润松、葛政锟、李恒雨、赵洵、刘宏宇、林丁洋、牛苗赫、兰亭序、刘晓倩、丁妍、王成龙、肖桐。
 
+
+## 参考资料
+
+- [Foundations of Large Language Models](https://arxiv.org/abs/2501.09223)
+- [Ordinary Differential Equations in Vision and Language](https://www.techrxiv.org/doi/full/10.36227/techrxiv.177160477.75893679/v1)
+- [Reinforcement Learning without Tears: An Introduction in the Era of Large Language Models](https://wangclnlp.github.io/RL-without-Tears-site/)等。
+
+
 ## 联系我们
 有任何问题请联系xiaotong [at] mail.neu.edu.cn （肖桐） 或 wangchenglong [at] mail.neu.edu.cn（王成龙）
